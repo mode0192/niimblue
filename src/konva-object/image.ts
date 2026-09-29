@@ -26,12 +26,13 @@ export class ImageObject extends DesignerObject {
     });
     this.useNaturalSize = !hasExplicitSize;
     this.src = String(options.src ?? options.data ?? "");
+    const emptyImage = document.createElement("img");
     this.imageNode = new Konva.Image({
       x: 0,
       y: 0,
       width: this.width,
       height: this.height,
-      image: undefined,
+      image: emptyImage,
       listening: false,
     });
     this.node.add(this.imageNode);
