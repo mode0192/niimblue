@@ -54,7 +54,7 @@ export class CustomCanvas {
 
   onZoomChange?: (zoom: number) => void;
 
-  constructor(container?: HTMLElement, options?: { width?: number; height?: number }) {
+  constructor(container?: HTMLDivElement, options?: { width?: number; height?: number }) {
     this.width = Number(options?.width ?? DEFAULT_LABEL_PROPS.size.width);
     this.height = Number(options?.height ?? DEFAULT_LABEL_PROPS.size.height);
 
@@ -86,7 +86,7 @@ export class CustomCanvas {
 
   private bindStageEvents(): void {
     this.stage.on("pointerdown", (e) => {
-      this.emit("mouse:down", { e: e.e, target: e.target });
+      this.emit("mouse:down", { e: e.evt, target: e.target });
 
       if (e.target === this.stage || e.target.getLayer() === this.backgroundLayer) {
         this.discardActiveObject();
@@ -99,7 +99,7 @@ export class CustomCanvas {
       const object = this.objects.find((candidate) => candidate.node === group);
       if (!object) return;
 
-      const pointer = e.e as PointerEvent;
+      const pointer = e.evt as PointerEvent;
       const multi = pointer.shiftKey || pointer.ctrlKey || pointer.metaKey;
       if (multi) {
         const already = this.selection.includes(object);
