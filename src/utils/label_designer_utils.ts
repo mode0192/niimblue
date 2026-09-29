@@ -1,89 +1,48 @@
-import * as fabric from "$/konva-object/compat";
 import { GRID_SIZE, OBJECT_DEFAULTS } from "$/defaults";
 import type { MoveDirection } from "$/types";
+import { CustomCanvas } from "$/fabric-object/custom_canvas";
+import type { DesignerObject } from "$/konva-object/base";
+import { TextboxObject } from "$/konva-object/textbox";
 
 export class LabelDesignerUtils {
-  static async cloneSelection(canvas: fabric.Canvas): Promise<void> {
-    const clonedList: fabric.FabricObject[] = [];
+  static async cloneSelection(canvas: CustomCanvas): Promise<void> {
+    const selected = canvas.getActiveObjects();
+    if (selected.length === 0) return;
 
-    const selection = canvas.getActiveObject();
-
-    if (selection === undefined) {
-      return;
+    const clones: DesignerObject[] = [];
+    for (const object of selected) {
+      const clone = await object.clone();
+      clone.left += GRID_SIZE;
+      clone.top += GRID_SIZE;
+      clone.snapAngle = OBJECT_DEFAULTS.snapAngle;
+      clones.push(clone);
     }
 
-    const selected: fabric.FabricObject[] = canvas.getActiveObjects();
-
-    for (const obj of selected) {
-      const cloned = await obj.clone();
-
-      if (selection instanceof fabric.ActiveSelection) {
-        cloned.left += selection.left + selection.width / 2;
-        cloned.top += selection.top + selection.height / 2;
-      }
-
-      cloned.top += GRID_SIZE;
-      cloned.left += GRID_SIZE;
-      cloned.snapAngle = OBJECT_DEFAULTS.snapAngle;
-
-      clonedList.push(cloned);
-    }
-
-    canvas.add(...clonedList);
-
-    const newSelection = new fabric.ActiveSelection(clonedList);
-    canvas.setActiveObject(newSelection);
+    canvas.add(...clones);
+    canvas.setActiveObjects(clones);
   }
 
-  static moveSelection(
-    canvas: fabric.Canvas,
-    direction: MoveDirection,
-    ctrl?: boolean,
-  ) {
-    const selected: fabric.FabricObject[] = canvas.getActiveObjects();
+  static moveSelection(canvas: CustomCanvas, direction: MoveDirection, ctrl?: boolean): void {
     const amount = ctrl ? 1 : GRID_SIZE;
-
-    selected.forEach((obj) => {
-      if (direction === "left") {
-        // round to fix inter-pixel positions
-        obj.left = Math.round(obj.left) - amount;
-      } else if (direction === "right") {
-        obj.left = Math.round(obj.left) + amount;
-      } else if (direction === "up") {
-        obj.top = Math.round(obj.top) - amount;
-      } else if (direction === "down") {
-        obj.top = Math.round(obj.top) + amount;
-      }
-      obj.setCoords();
+    canvas.getActiveObjects().forEach((object) => {
+      if (direction === "left") object.left = Math.round(object.left) - amount;
+      else if (direction === "right") object.left = Math.round(object.left) + amount;
+      else if (direction === "up") object.top = Math.round(object.top) - amount;
+      else if (direction === "down") object.top = Math.round(object.top) + amount;
+      object.setCoords();
     });
     canvas.requestRenderAll();
   }
 
-  static deleteSelection(canvas: fabric.Canvas) {
-    const selected: fabric.FabricObject[] = canvas.getActiveObjects();
-    selected.forEach((obj) => {
-      canvas.remove(obj);
-    });
+  static deleteSelection(canvas: CustomCanvas): void {
+    canvas.getActiveObjects().forEach((object) => canvas.remove(object));
   }
 
-  static isAnyInputFocused(canvas: fabric.Canvas): boolean {
-    const focused: Element | null = document.activeElement;
-
-    if (
-      focused !== null &&
-      (focused.tagName === "INPUT" || focused.tagName === "TEXTAREA")
-    ) {
+  static isAnyInputFocused(canvas: CustomCanvas): boolean {
+    const focused = document.activeElement;
+    if (focused && (focused.tagName === "INPUT" || focused.tagName === "TEXTAREA")) {
       return true;
     }
-    const selected: fabric.FabricObject[] = canvas.getActiveObjects();
-    const editing = selected.some(
-      (obj) => obj instanceof fabric.IText && obj.isEditing,
-    );
-
-    if (editing) {
-      return true;
-    }
-
-    return false;
+    return canvas.getActiveObjects().some((object) => object instanceof TextboxObject && object.isEditing);
   }
 }
