@@ -1,12 +1,34 @@
 import Konva from "konva";
 import { code128b, ean13 } from "$/utils/barcode";
 import { DesignerObject, type DesignerObjectData } from "$/konva-object/base";
-import { CanvasUtils } from "$/utils/canvas_utils";
 
 const EAN13_LONG_BAR_INDEXES = new Set([0, 1, 2, 45, 46, 47, 48, 49, 92, 93, 94]);
 export type BarcodeCoding = "EAN13" | "CODE128B";
 
 const measureContext = document.createElement("canvas").getContext("2d")!;
+
+const equalSpacingFillText = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  printWidth: number,
+) => {
+  if (text.length <= 1) {
+    ctx.fillText(text, x, y);
+    return;
+  }
+
+  const widths = [...text].map((char) => ctx.measureText(char).width);
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0);
+  const spacing = (printWidth - totalWidth) / (text.length - 1);
+
+  let offset = 0;
+  for (let i = 0; i < text.length; i++) {
+    ctx.fillText(text[i], x + offset, y);
+    offset += widths[i] + spacing;
+  }
+};
 
 export class Barcode extends DesignerObject {
   readonly shape: Konva.Shape;
@@ -136,14 +158,14 @@ export class Barcode extends DesignerObject {
 
         ctx.textAlign = "left";
         ctx.fillText(parts[0], 0, this.height);
-        CanvasUtils.equalSpacingFillText(
+        equalSpacingFillText(
           ctx,
           parts[1],
           letterWidth + longBars1End * this.scaleFactor,
           this.height,
           midPartWidth * this.scaleFactor,
         );
-        CanvasUtils.equalSpacingFillText(
+        equalSpacingFillText(
           ctx,
           parts[2],
           letterWidth + longBars2End * this.scaleFactor,
@@ -153,7 +175,7 @@ export class Barcode extends DesignerObject {
         ctx.fillText(parts[3], this.width - letterWidth, this.height);
       } else {
         ctx.textAlign = "left";
-        CanvasUtils.equalSpacingFillText(
+        equalSpacingFillText(
           ctx,
           this.displayText,
           barcodeStartPos,
