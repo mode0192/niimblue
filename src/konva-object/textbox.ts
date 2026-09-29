@@ -191,7 +191,7 @@ export class TextboxObject extends DesignerObject {
     textarea.style.lineHeight = String(this.lineHeight);
     textarea.style.textAlign = this.textAlign;
     textarea.style.transformOrigin = "left top";
-    textarea.style.transform = `rotate(${rotation}deg)`;
+    textarea.style.transform = `rotateZ(${rotation}deg) translateY(-2px)`;
     textarea.style.zIndex = "10000";
 
     const update = () => {
