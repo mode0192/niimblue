@@ -1,4 +1,4 @@
-import * as fabric from "fabric";
+import * as fabric from "$/konva-object/compat";
 import { OBJECT_DEFAULTS, OBJECT_DEFAULTS_TEXT, OBJECT_DEFAULTS_VECTOR, OBJECT_SIZE_DEFAULTS } from "$/defaults";
 import { ArUcoMarker } from "$/fabric-object/aruco";
 import Barcode from "$/fabric-object/barcode";
