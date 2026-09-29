@@ -99,7 +99,7 @@ export class CustomCanvas {
       this.emit("mouse:down", { e: e.evt, target: e.target });
 
       // Transformer handles/border own their pointer gesture.
-      if (e.target === this.transformer || e.target.findAncestor("Transformer", true)) {
+      if (e.target.findAncestor((node) => node === this.transformer, true)) {
         return;
       }
 
