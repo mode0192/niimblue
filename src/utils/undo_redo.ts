@@ -1,4 +1,4 @@
-import * as fabric from "fabric";
+import * as fabric from "$/konva-object/compat";
 import type { ExportedLabelTemplate, LabelProps } from "$/types";
 
 export type UndoState = { undoDisabled: boolean; redoDisabled: boolean };
