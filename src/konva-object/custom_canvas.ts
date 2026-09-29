@@ -53,12 +53,13 @@ export class CustomCanvas {
 
   onZoomChange?: (zoom: number) => void;
 
-  constructor(container: HTMLElement, options?: { width?: number; height?: number }) {
+  constructor(container?: HTMLElement, options?: { width?: number; height?: number }) {
     this.width = Number(options?.width ?? DEFAULT_LABEL_PROPS.size.width);
     this.height = Number(options?.height ?? DEFAULT_LABEL_PROPS.size.height);
 
+    const stageContainer = container ?? document.createElement("div");
     this.stage = new Konva.Stage({
-      container,
+      container: stageContainer,
       width: this.width,
       height: this.height,
     });
