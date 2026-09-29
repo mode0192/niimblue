@@ -87,7 +87,9 @@ export class TextboxObject extends DesignerObject {
         .filter(Boolean)
         .join(" "),
       align: this.textAlign,
-      verticalAlign: this.originY === "top" ? "top" : this.originY === "bottom" ? "bottom" : "middle",
+      // Fabric's originY controls object positioning, not text layout.
+      // Keep text at the top of its box; the DOM textarea uses the same geometry.
+      verticalAlign: "top",
       lineHeight: this.lineHeight,
       wrap: this.splitByGrapheme ? "char" : "word",
       direction: this.direction,
@@ -144,16 +146,19 @@ export class TextboxObject extends DesignerObject {
     if (this.isEditing || !this.canvas) return;
 
     const stage = this.canvas.stage;
-    const container = stage.container();
-    const stageRect = container.getBoundingClientRect();
-    const transform = this.node.getAbsoluteTransform();
-    const topLeft = transform.point({ x: 0, y: 0 });
-    const scaleX = stageRect.width / Math.max(1, stage.width());
-    const scaleY = stageRect.height / Math.max(1, stage.height());
+    const stageRect = stage.content.getBoundingClientRect();
+    const textPosition = this.textNode.absolutePosition();
+    const absoluteScale = this.textNode.getAbsoluteScale();
+    const cssScaleX = stageRect.width / Math.max(1, stage.width());
+    const cssScaleY = stageRect.height / Math.max(1, stage.height());
+    const screenScaleX = Math.abs(absoluteScale.x) * cssScaleX;
+    const screenScaleY = Math.abs(absoluteScale.y) * cssScaleY;
+    const rotation = this.textNode.getAbsoluteRotation();
 
     this.isEditing = true;
     this.node.visible(false);
-    this.canvas.updateTransformer();
+    this.canvas.transformer.visible(false);
+    this.canvas.overlayLayer.batchDraw();
 
     const textarea = document.createElement("textarea");
     this.textarea = textarea;
@@ -161,27 +166,32 @@ export class TextboxObject extends DesignerObject {
     textarea.dir = this.direction;
     textarea.spellcheck = false;
     textarea.wrap = this.splitByGrapheme ? "off" : "soft";
+
     textarea.style.position = "fixed";
-    textarea.style.left = `${stageRect.left + topLeft.x * scaleX}px`;
-    textarea.style.top = `${stageRect.top + topLeft.y * scaleY}px`;
-    textarea.style.width = `${Math.max(24, this.width * scaleX)}px`;
-    textarea.style.height = `${Math.max(24, this.height * scaleY)}px`;
+    textarea.style.left = `${stageRect.left + textPosition.x * cssScaleX}px`;
+    textarea.style.top = `${stageRect.top + textPosition.y * cssScaleY}px`;
+    textarea.style.width = `${Math.max(24, this.textNode.width() * screenScaleX)}px`;
+    textarea.style.height = `${Math.max(24, this.textNode.height() * screenScaleY)}px`;
+    textarea.style.boxSizing = "border-box";
     textarea.style.padding = "0";
     textarea.style.margin = "0";
-    textarea.style.border = "1px solid #0d6efd";
-    textarea.style.outline = "none";
+    textarea.style.border = "none";
+    textarea.style.outline = "1px solid #0d6efd";
+    textarea.style.outlineOffset = "0";
     textarea.style.resize = "none";
     textarea.style.overflow = "hidden";
-    textarea.style.background = this.backgroundColor === "transparent" ? "transparent" : this.backgroundColor;
+    textarea.style.background =
+      this.backgroundColor === "transparent" ? "transparent" : this.backgroundColor;
     textarea.style.color = this.fill;
+    textarea.style.caretColor = this.fill;
     textarea.style.fontFamily = this.fontFamily;
-    textarea.style.fontSize = `${this.fontSize * scaleY}px`;
+    textarea.style.fontSize = `${this.fontSize * screenScaleY}px`;
     textarea.style.fontWeight = String(this.fontWeight);
     textarea.style.fontStyle = this.fontStyle;
     textarea.style.lineHeight = String(this.lineHeight);
     textarea.style.textAlign = this.textAlign;
     textarea.style.transformOrigin = "left top";
-    textarea.style.transform = `rotate(${this.angle}deg)`;
+    textarea.style.transform = `rotate(${rotation}deg)`;
     textarea.style.zIndex = "10000";
 
     const update = () => {
@@ -224,7 +234,10 @@ export class TextboxObject extends DesignerObject {
     this.isEditing = false;
     this.node.visible(true);
     this.updateVisual();
-    this.canvas?.updateTransformer();
+    if (this.canvas) {
+      this.canvas.transformer.visible(true);
+      this.canvas.updateTransformer();
+    }
     this.canvas?.requestRenderAll();
     this.emitModified({ action: "text" });
   }
