@@ -1,4 +1,4 @@
-import * as fabric from "fabric";
+import * as fabric from "$/konva-object/compat";
 import type { AppConfig, LabelPreset, LabelProps } from "$/types";
 import { TextboxExt } from "$/fabric-object/textbox-ext";
 
