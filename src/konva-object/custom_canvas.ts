@@ -38,6 +38,7 @@ export class CustomCanvas {
   readonly objectLayer: Konva.Layer;
   readonly overlayLayer: Konva.Layer;
   readonly mirrorGhosts: Konva.Group;
+  readonly selectionRectangle: Konva.Rect;
   readonly transformer: Konva.Transformer;
 
   width: number;
@@ -51,6 +52,7 @@ export class CustomCanvas {
   private highlightMirror = true;
   private gridEnabled = false;
   private virtualZoomRatio = 1;
+  private areaSelectStart?: { x: number; y: number };
 
   onZoomChange?: (zoom: number) => void;
 
@@ -69,6 +71,14 @@ export class CustomCanvas {
     this.overlayLayer = new Konva.Layer();
 
     this.mirrorGhosts = new Konva.Group({ listening: false });
+    this.selectionRectangle = new Konva.Rect({
+      visible: false,
+      listening: false,
+      fill: "rgba(13, 110, 253, 0.16)",
+      stroke: "#0d6efd",
+      strokeWidth: 1,
+      dash: [4, 3],
+    });
     this.transformer = new Konva.Transformer({
       rotateEnabled: true,
       borderStroke: "#0d6efd",
@@ -77,7 +87,7 @@ export class CustomCanvas {
       anchorSize: 8,
       padding: 1,
     });
-    this.overlayLayer.add(this.mirrorGhosts, this.transformer);
+    this.overlayLayer.add(this.mirrorGhosts, this.selectionRectangle, this.transformer);
 
     this.stage.add(this.backgroundLayer, this.objectLayer, this.overlayLayer);
     this.bindStageEvents();
@@ -88,26 +98,98 @@ export class CustomCanvas {
     this.stage.on("pointerdown", (e) => {
       this.emit("mouse:down", { e: e.evt, target: e.target });
 
-      if (e.target === this.stage || e.target.getLayer() === this.backgroundLayer) {
-        this.discardActiveObject();
+      // Transformer handles/border own their pointer gesture.
+      if (e.target === this.transformer || e.target.findAncestor("Transformer", true)) {
         return;
       }
 
       const group = e.target.findAncestor(".designer-object", true) as Konva.Group | null;
-      if (!group) return;
+      if (group) {
+        const object = this.objects.find((candidate) => candidate.node === group);
+        if (!object) return;
 
-      const object = this.objects.find((candidate) => candidate.node === group);
-      if (!object) return;
+        const pointer = e.evt as PointerEvent;
+        const multi = pointer.shiftKey || pointer.ctrlKey || pointer.metaKey;
 
-      const pointer = e.evt as PointerEvent;
-      const multi = pointer.shiftKey || pointer.ctrlKey || pointer.metaKey;
-      if (multi) {
-        const already = this.selection.includes(object);
-        this.applySelection(already ? this.selection.filter((item) => item !== object) : [...this.selection, object]);
-      } else {
-        this.applySelection([object]);
+        if (multi) {
+          const alreadySelected = this.selection.includes(object);
+          this.applySelection(
+            alreadySelected
+              ? this.selection.filter((item) => item !== object)
+              : [...this.selection, object],
+          );
+        } else if (this.selection.length !== 1 || this.selection[0] !== object) {
+          this.applySelection([object]);
+        }
+        return;
+      }
+
+      // Blank canvas starts a marquee gesture. Do not clear the old selection
+      // until pointerup, otherwise a tiny hand movement makes selection feel flaky.
+      if (e.target === this.stage) {
+        const pos = this.stage.getPointerPosition();
+        if (!pos) return;
+
+        this.areaSelectStart = { x: pos.x, y: pos.y };
+        this.selectionRectangle.setAttrs({
+          x: pos.x,
+          y: pos.y,
+          width: 0,
+          height: 0,
+          visible: true,
+        });
+        this.selectionRectangle.moveToTop();
+        this.transformer.moveToTop();
+        this.overlayLayer.batchDraw();
       }
     });
+
+    this.stage.on("pointermove", () => {
+      if (!this.areaSelectStart || !this.selectionRectangle.visible()) return;
+
+      const pos = this.stage.getPointerPosition();
+      if (!pos) return;
+
+      this.selectionRectangle.setAttrs({
+        x: Math.min(this.areaSelectStart.x, pos.x),
+        y: Math.min(this.areaSelectStart.y, pos.y),
+        width: Math.abs(pos.x - this.areaSelectStart.x),
+        height: Math.abs(pos.y - this.areaSelectStart.y),
+      });
+      this.overlayLayer.batchDraw();
+    });
+
+    const finishAreaSelection = () => {
+      if (!this.areaSelectStart || !this.selectionRectangle.visible()) return;
+
+      const width = this.selectionRectangle.width();
+      const height = this.selectionRectangle.height();
+      const isMarquee = width >= 3 || height >= 3;
+
+      if (isMarquee) {
+        const box = {
+          x: this.selectionRectangle.x(),
+          y: this.selectionRectangle.y(),
+          width,
+          height,
+        };
+        const selected = this.objects.filter((object) =>
+          Konva.Util.haveIntersection(
+            box,
+            object.node.getClientRect({ relativeTo: this.stage }),
+          ),
+        );
+        this.applySelection(selected);
+      } else {
+        this.discardActiveObject();
+      }
+
+      this.areaSelectStart = undefined;
+      this.selectionRectangle.visible(false);
+      this.overlayLayer.batchDraw();
+    };
+
+    this.stage.on("pointerup pointercancel", finishAreaSelection);
 
     this.stage.container().addEventListener("dragover", (e) => {
       e.preventDefault();
