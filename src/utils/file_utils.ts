@@ -1,4 +1,3 @@
-import * as fabric from "$/konva-object/compat";
 import {
   ExportedLabelTemplateSchema,
   LabelPresetSchema,
@@ -8,11 +7,10 @@ import {
   type LabelPreset,
   type LabelProps,
 } from "$/types";
-import { OBJECT_DEFAULTS, OBJECT_DEFAULTS_VECTOR, THUMBNAIL_HEIGHT, THUMBNAIL_QUALITY } from "$/defaults";
+import { THUMBNAIL_HEIGHT, THUMBNAIL_QUALITY } from "$/defaults";
 import { z } from "zod";
 import { CustomCanvas } from "$/fabric-object/custom_canvas";
 import { Capacitor } from "@capacitor/core";
-import { CanvasUtils } from "$/utils/canvas_utils";
 import { LocalStoragePersistence } from "./persistence";
 import { csvData, loadedFonts } from "$/stores";
 import { get } from "svelte/store";
@@ -145,12 +143,8 @@ export class FileUtils {
     FileUtils.downloadBase64Web(filename, mime, base64Data);
   }
 
-  static makeExportedLabel(canvas: fabric.Canvas, labelProps: LabelProps, includeCsv: boolean): ExportedLabelTemplate {
+  static makeExportedLabel(canvas: CustomCanvas, labelProps: LabelProps, includeCsv: boolean): ExportedLabelTemplate {
     const thumbnailBase64: string = canvas.toDataURL({
-      width: canvas.width,
-      height: canvas.height,
-      left: 0,
-      top: 0,
       multiplier: THUMBNAIL_HEIGHT / (canvas.height || 1),
       quality: THUMBNAIL_QUALITY,
       format: "jpeg",
@@ -186,17 +180,10 @@ export class FileUtils {
   }
 
   /** Convert canvas to PNG and download it */
-  static saveCanvasAsPng(canvas: fabric.Canvas) {
+  static saveCanvasAsPng(canvas: CustomCanvas) {
     const timestamp = FileUtils.timestamp();
 
-    const url = canvas.toDataURL({
-      width: canvas.width,
-      height: canvas.height,
-      left: 0,
-      top: 0,
-      format: "png",
-      multiplier: 1,
-    });
+    const url = canvas.toDataURL({ format: "png", multiplier: 1 });
 
     FileUtils.downloadBase64(`label_${timestamp}.png`, "image/png", url.split("base64,")[1]);
   }
@@ -276,48 +263,9 @@ export class FileUtils {
     return { name: file.name, data };
   }
 
-  static async loadCanvasState(canvas: fabric.Canvas, state: FabricJson): Promise<void> {
-    const deprecatedLines: fabric.Line[] = [];
-
-    await canvas.loadFromJSON(state, (_, obj) => {
-      if (obj instanceof fabric.FabricObject) {
-        obj.set({ snapAngle: OBJECT_DEFAULTS.snapAngle });
-        CanvasUtils.fixFabricObjectScale(obj);
-
-        if (obj instanceof fabric.Line) {
-          deprecatedLines.push(obj);
-        }
-      }
-    });
-
-    // convert deprecated Line to Polyline
-    for (const line of deprecatedLines) {
-      const poly = new fabric.Polyline(
-        [
-          { x: line.x1, y: line.y1 },
-          { x: line.x2, y: line.y2 },
-        ],
-        {
-          ...OBJECT_DEFAULTS_VECTOR,
-          left: line.left,
-          top: line.top,
-          angle: line.angle,
-          scaleX: line.scaleX,
-          scaleY: line.scaleY,
-          fill: line.fill,
-          stroke: line.stroke,
-          strokeWidth: line.strokeWidth,
-        },
-      );
-
-      canvas.remove(line);
-      canvas.add(poly);
-    }
-
-    if (canvas instanceof CustomCanvas) {
-      canvas.virtualZoom(canvas.getVirtualZoom());
-    }
-
+  static async loadCanvasState(canvas: CustomCanvas, state: FabricJson): Promise<void> {
+    await canvas.loadFromJSON(state);
+    canvas.virtualZoom(canvas.getVirtualZoom());
     canvas.requestRenderAll();
   }
 
