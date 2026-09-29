@@ -31,6 +31,7 @@ export class ImageObject extends DesignerObject {
       y: 0,
       width: this.width,
       height: this.height,
+      image: undefined,
       listening: false,
     });
     this.node.add(this.imageNode);
