@@ -1,6 +1,7 @@
 import Konva from "konva";
 import { code128b, ean13 } from "$/utils/barcode";
 import { DesignerObject, type DesignerObjectData } from "$/konva-object/base";
+import { CanvasUtils } from "$/utils/canvas_utils";
 
 const EAN13_LONG_BAR_INDEXES = new Set([0, 1, 2, 45, 46, 47, 48, 49, 92, 93, 94]);
 export type BarcodeCoding = "EAN13" | "CODE128B";
@@ -122,8 +123,44 @@ export class Barcode extends DesignerObject {
     flush(barcodeStartPos + this.barcodeEncoded.length * this.scaleFactor);
 
     if (this.printText) {
-      ctx.textAlign = "center";
-      ctx.fillText(this.displayText, this.width / 2, this.height);
+      if (this.encoding === "EAN13") {
+        const parts = [
+          this.displayText[0],
+          this.displayText.slice(1, 7),
+          this.displayText.slice(7, 13),
+          ">",
+        ];
+        const midPartWidth = 40;
+        const longBars1End = 4;
+        const longBars2End = 50;
+
+        ctx.textAlign = "left";
+        ctx.fillText(parts[0], 0, this.height);
+        CanvasUtils.equalSpacingFillText(
+          ctx,
+          parts[1],
+          letterWidth + longBars1End * this.scaleFactor,
+          this.height,
+          midPartWidth * this.scaleFactor,
+        );
+        CanvasUtils.equalSpacingFillText(
+          ctx,
+          parts[2],
+          letterWidth + longBars2End * this.scaleFactor,
+          this.height,
+          midPartWidth * this.scaleFactor,
+        );
+        ctx.fillText(parts[3], this.width - letterWidth, this.height);
+      } else {
+        ctx.textAlign = "left";
+        CanvasUtils.equalSpacingFillText(
+          ctx,
+          this.displayText,
+          barcodeStartPos,
+          this.height,
+          this.width,
+        );
+      }
     }
     ctx.restore();
   }
