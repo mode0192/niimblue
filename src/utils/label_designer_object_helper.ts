@@ -1,4 +1,3 @@
-import * as fabric from "$/konva-object/compat";
 import { OBJECT_DEFAULTS, OBJECT_DEFAULTS_TEXT, OBJECT_DEFAULTS_VECTOR, OBJECT_SIZE_DEFAULTS } from "$/defaults";
 import { ArUcoMarker } from "$/fabric-object/aruco";
 import Barcode from "$/fabric-object/barcode";
@@ -7,155 +6,129 @@ import type { OjectType } from "$/types";
 import { Toasts } from "$/utils/toasts";
 import { FileUtils } from "$/utils/file_utils";
 import { CanvasUtils } from "$/utils/canvas_utils";
-import { TextboxExt, TextboxExtProps } from "$/fabric-object/textbox-ext";
+import { TextboxExt, type TextboxExtProps } from "$/fabric-object/textbox-ext";
+import { ImageObject } from "$/konva-object/image";
+import { RectObject, CircleObject, LineObject } from "$/konva-object/shapes";
+import type { DesignerObject } from "$/konva-object/base";
+import { CustomCanvas } from "$/fabric-object/custom_canvas";
 
 export class LabelDesignerObjectHelper {
-  static async addSvg(canvas: fabric.Canvas, svgCode: string): Promise<fabric.FabricObject | fabric.Group> {
-    const { objects, options } = await fabric.loadSVGFromString(svgCode);
-    const obj = fabric.util.groupSVGElements(
-      objects.filter((o) => o !== null),
-      options,
-    );
-    obj.set({ ...OBJECT_DEFAULTS });
+  static async addSvg(canvas: CustomCanvas, svgCode: string): Promise<ImageObject> {
+    const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgCode)}`;
+    const obj = new ImageObject({ ...OBJECT_DEFAULTS });
+    await obj.loadSource(src);
     CanvasUtils.fitObjectIntoCanvas(canvas, obj, OBJECT_DEFAULTS.left, OBJECT_DEFAULTS.top);
     canvas.add(obj);
     canvas.renderAll();
     return obj;
   }
 
-  static async addImageFile(canvas: fabric.Canvas, file: File): Promise<fabric.FabricObject | fabric.Group> {
-    if (file.type.startsWith("image/svg")) {
-      const data = await file.text();
-      return await this.addSvg(canvas, data);
+  static async addImageFile(canvas: CustomCanvas, file: File): Promise<ImageObject> {
+    const supported =
+      file.type.startsWith("image/svg") ||
+      file.type === "image/png" ||
+      file.type === "image/jpeg" ||
+      file.type === "image/bmp" ||
+      file.type === "image/gif";
+
+    if (!supported) {
+      throw new Error("Unsupported image");
     }
 
-    if (file.type === "image/png" || file.type === "image/jpeg" || file.type === "image/bmp" || file.type === "image/gif") {
-      const url = await FileUtils.blobToDataUrl(file);
-      const fabricImg = await fabric.FabricImage.fromURL(url);
-      fabricImg.set({ ...OBJECT_DEFAULTS });
-      CanvasUtils.fitObjectIntoCanvas(canvas, fabricImg, OBJECT_DEFAULTS.left, OBJECT_DEFAULTS.top);
-      canvas.add(fabricImg);
-      return fabricImg;
-    }
-
-    throw new Error("Unsupported image");
+    const src = await FileUtils.blobToDataUrl(file);
+    const obj = new ImageObject({ ...OBJECT_DEFAULTS });
+    await obj.loadSource(src);
+    CanvasUtils.fitObjectIntoCanvas(canvas, obj, OBJECT_DEFAULTS.left, OBJECT_DEFAULTS.top);
+    canvas.add(obj);
+    return obj;
   }
 
-  static async addImageWithFilePicker(fabricCanvas: fabric.Canvas): Promise<fabric.FabricObject | fabric.Group> {
+  static async addImageWithFilePicker(canvas: CustomCanvas): Promise<ImageObject> {
     const files = await FileUtils.pickFileAsync("*", false);
     try {
-      return await this.addImageFile(fabricCanvas, files[0]);
+      return await this.addImageFile(canvas, files[0]);
     } catch (e) {
-      // fixme: catch error in other place
       Toasts.error(e);
       throw e;
     }
   }
 
-  static async addImageBlob(fabricCanvas: fabric.Canvas, img: Blob): Promise<fabric.FabricImage> {
-    const url = await FileUtils.blobToDataUrl(img);
-    const fabricImg = await fabric.FabricImage.fromURL(url);
-    fabricImg.set({ left: 0, top: 0, snapAngle: OBJECT_DEFAULTS.snapAngle });
-    fabricCanvas.add(fabricImg);
-    return fabricImg;
+  static async addImageBlob(canvas: CustomCanvas, img: Blob): Promise<ImageObject> {
+    const src = await FileUtils.blobToDataUrl(img);
+    const obj = new ImageObject({ left: 0, top: 0, snapAngle: OBJECT_DEFAULTS.snapAngle });
+    await obj.loadSource(src);
+    canvas.add(obj);
+    return obj;
   }
 
-  static async addObjectFromClipboard(
-    fabricCanvas: fabric.Canvas,
-    data: DataTransfer,
-  ): Promise<fabric.FabricObject | undefined> {
-    // paste image
+  static async addImageElement(canvas: CustomCanvas, element: HTMLCanvasElement): Promise<ImageObject> {
+    const obj = new ImageObject({ left: 0, top: 0, width: element.width, height: element.height });
+    await obj.loadSource(element.toDataURL("image/png"));
+    canvas.add(obj);
+    return obj;
+  }
+
+  static async addObjectFromClipboard(canvas: CustomCanvas, data: DataTransfer): Promise<DesignerObject | undefined> {
     for (const item of data.items) {
       if (item.type.includes("image")) {
         const file = item.getAsFile();
-        if (file) {
-          return await LabelDesignerObjectHelper.addImageFile(fabricCanvas, file);
-        }
+        if (file) return await this.addImageFile(canvas, file);
       }
     }
 
-    // paste text
     const text = data.getData("text");
     if (text) {
-      const obj = LabelDesignerObjectHelper.addText(fabricCanvas, text);
-      fabricCanvas.setActiveObject(obj);
+      const obj = this.addText(canvas, text);
+      canvas.setActiveObject(obj);
       return obj;
     }
   }
 
-  static addText(canvas: fabric.Canvas, text?: string, options?: Partial<TextboxExtProps>): TextboxExt {
-    const obj = new TextboxExt(text ?? "Text", {
-      ...OBJECT_DEFAULTS_TEXT,
-      ...options,
-    });
+  static addText(canvas: CustomCanvas, text?: string, options?: Partial<TextboxExtProps>): TextboxExt {
+    const obj = new TextboxExt(text ?? "Text", { ...OBJECT_DEFAULTS_TEXT, ...options });
     canvas.add(obj);
     canvas.centerObject(obj);
     return obj;
   }
 
-  static addStaticText(canvas: fabric.Canvas, text?: string, options?: Partial<fabric.TextProps>): fabric.FabricText {
-    const obj = new fabric.FabricText(text ?? "Text", {
-      ...OBJECT_DEFAULTS_TEXT,
-      ...options,
-    });
-    canvas.add(obj);
-    canvas.centerObject(obj);
-    return obj;
+  static addStaticText(canvas: CustomCanvas, text?: string, options?: Record<string, any>): TextboxExt {
+    return this.addText(canvas, text, options);
   }
 
-  static addHLine(canvas: fabric.Canvas): fabric.Polyline {
-    const obj = new fabric.Polyline(
-      [
-        { x: OBJECT_DEFAULTS.left, y: OBJECT_DEFAULTS.top },
-        { x: OBJECT_DEFAULTS.left + OBJECT_SIZE_DEFAULTS.width, y: OBJECT_DEFAULTS.top },
-      ],
-      { ...OBJECT_DEFAULTS_VECTOR },
-    );
+  static addHLine(canvas: CustomCanvas): LineObject {
+    const obj = new LineObject({ ...OBJECT_DEFAULTS_VECTOR, width: OBJECT_SIZE_DEFAULTS.width, height: 1 });
     canvas.add(obj);
     canvas.centerObjectV(obj);
     return obj;
   }
 
-  static addCircle(canvas: fabric.Canvas): fabric.Circle {
-    const obj = new fabric.Circle({
-      ...OBJECT_DEFAULTS_VECTOR,
-      radius: OBJECT_SIZE_DEFAULTS.width / 2,
-    });
+  static addCircle(canvas: CustomCanvas): CircleObject {
+    const obj = new CircleObject({ ...OBJECT_DEFAULTS_VECTOR, ...OBJECT_SIZE_DEFAULTS });
     canvas.add(obj);
     canvas.centerObjectV(obj);
     return obj;
   }
 
-  static addRect(canvas: fabric.Canvas): fabric.Rect {
-    const obj = new fabric.Rect({
-      ...OBJECT_SIZE_DEFAULTS,
-      ...OBJECT_DEFAULTS_VECTOR,
-    });
+  static addRect(canvas: CustomCanvas): RectObject {
+    const obj = new RectObject({ ...OBJECT_SIZE_DEFAULTS, ...OBJECT_DEFAULTS_VECTOR });
     canvas.add(obj);
     canvas.centerObjectV(obj);
     return obj;
   }
 
-  static addQrCode(canvas: fabric.Canvas): QRCode {
-    const qr = new QRCode({
-      text: "NiimBlue",
-      ...OBJECT_SIZE_DEFAULTS,
-      ...OBJECT_DEFAULTS,
-    });
+  static addQrCode(canvas: CustomCanvas): QRCode {
+    const qr = new QRCode({ text: "NiimBlue", ...OBJECT_SIZE_DEFAULTS, ...OBJECT_DEFAULTS });
     canvas.add(qr);
     return qr;
   }
 
-  static addArUco(canvas: fabric.Canvas): ArUcoMarker {
-    const aruco = new ArUcoMarker({
-      ...OBJECT_SIZE_DEFAULTS,
-      ...OBJECT_DEFAULTS,
-    });
+  static addArUco(canvas: CustomCanvas): ArUcoMarker {
+    const aruco = new ArUcoMarker({ ...OBJECT_SIZE_DEFAULTS, ...OBJECT_DEFAULTS });
     canvas.add(aruco);
     return aruco;
   }
 
-  static addBarcode(canvas: fabric.Canvas): Barcode {
+  static addBarcode(canvas: CustomCanvas): Barcode {
     const barcode = new Barcode({
       ...OBJECT_DEFAULTS,
       text: "123456789012",
@@ -166,7 +139,7 @@ export class LabelDesignerObjectHelper {
     return barcode;
   }
 
-  static addObject(canvas: fabric.Canvas, objType: OjectType): fabric.FabricObject | undefined {
+  static addObject(canvas: CustomCanvas, objType: OjectType): DesignerObject | undefined {
     switch (objType) {
       case "text":
         return this.addText(canvas);
@@ -177,7 +150,7 @@ export class LabelDesignerObjectHelper {
       case "rectangle":
         return this.addRect(canvas);
       case "image":
-        this.addImageWithFilePicker(canvas);
+        void this.addImageWithFilePicker(canvas).then((obj) => canvas.setActiveObject(obj));
         return;
       case "qrcode":
         return this.addQrCode(canvas);
