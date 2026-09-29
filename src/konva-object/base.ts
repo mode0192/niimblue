@@ -14,6 +14,7 @@ const makeObjectId = () => `obj_${Date.now().toString(36)}_${(objectCounter++).t
 
 export abstract class DesignerObject {
   readonly node: Konva.Group;
+  private readonly hitArea: Konva.Shape;
   readonly type: string;
   id: string;
   canvas?: CustomCanvas;
@@ -59,6 +60,27 @@ export abstract class DesignerObject {
 
     this.node.setAttr("designerId", this.id);
     this.node.setAttr("designerType", type);
+
+    // Konva Groups do not have their own hit pixels. Most visual children in
+    // NiimBlue are intentionally non-listening, so give every designer object
+    // a hit-only rectangle. sceneFunc draws nothing to the visible canvas,
+    // while hitFunc paints the object's bounds only into Konva's hit canvas.
+    this.hitArea = new Konva.Shape({
+      x: 0,
+      y: 0,
+      width,
+      height,
+      listening: true,
+      fill: "#000000",
+      sceneFunc: () => {},
+      hitFunc: (context, shape) => {
+        context.beginPath();
+        context.rect(0, 0, shape.width(), shape.height());
+        context.closePath();
+        context.fillStrokeShape(shape);
+      },
+    });
+    this.node.add(this.hitArea);
   }
 
   get left(): number {
@@ -159,6 +181,7 @@ export abstract class DesignerObject {
   protected resize(width: number, height: number): void {
     const topLeft = this.getPointByOrigin("left", "top");
     this.node.size({ width, height });
+    this.hitArea.size({ width, height });
     this.node.offset({ x: width / 2, y: height / 2 });
     this.setPositionByOrigin(topLeft, "left", "top");
     this.updateVisual();
@@ -167,6 +190,7 @@ export abstract class DesignerObject {
   protected setSizeRaw(width: number, height: number, preserveTopLeft = true): void {
     const topLeft = preserveTopLeft ? this.getPointByOrigin("left", "top") : undefined;
     this.node.size({ width: Math.max(1, width), height: Math.max(1, height) });
+    this.hitArea.size({ width: this.node.width(), height: this.node.height() });
     this.node.offset({ x: this.node.width() / 2, y: this.node.height() / 2 });
     if (topLeft) {
       this.setPositionByOrigin(topLeft, "left", "top");
