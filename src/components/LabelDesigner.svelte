@@ -32,14 +32,13 @@
   import QrCodeParamsPanel from "$/components/designer-controls/QRCodeParamsControls.svelte";
   import TextParamsControls from "$/components/designer-controls/TextParamsControls.svelte";
   import VariableInsertControl from "$/components/designer-controls/VariableInsertControl.svelte";
-  import { DEFAULT_LABEL_PROPS, GRID_SIZE, OBJECT_DEFAULTS } from "$/defaults";
+  import { DEFAULT_LABEL_PROPS, GRID_SIZE } from "$/defaults";
   import { LabelDesignerUtils } from "$/utils/label_designer_utils";
   import SavedLabelsMenu from "$/components/designer-controls/SavedLabelsMenu.svelte";
   import { CustomCanvas } from "$/fabric-object/custom_canvas";
   import VectorParamsControls from "$/components/designer-controls/VectorParamsControls.svelte";
-  import { CanvasUtils } from "$/utils/canvas_utils";
 
-  let htmlCanvas: HTMLCanvasElement;
+  let htmlCanvas: HTMLDivElement;
 
   let fabricCanvas = $state<CustomCanvas>();
   let labelProps = $state<LabelProps>(DEFAULT_LABEL_PROPS);
@@ -176,13 +175,7 @@
   };
 
   const pdfImageReady = async (el: HTMLCanvasElement) => {
-    const img = new fabric.FabricImage(el, {
-      ...OBJECT_DEFAULTS,
-      left: 0,
-      top: 0,
-    });
-
-    fabricCanvas!.add(img);
+    const img = await LabelDesignerObjectHelper.addImageElement(fabricCanvas!, el);
     fabricCanvas!.setActiveObject(img);
     undo.push(fabricCanvas!, labelProps);
   };
@@ -422,14 +415,6 @@
       }
     });
 
-    fabricCanvas.on("object:scaling", (e): void => {
-      if (!e.target) {
-        return;
-      }
-
-      CanvasUtils.fixFabricObjectScale(e.target);
-    });
-
     // userFonts.subscribe((e) => {console.log(e); renderOnFontsChanged();});
 
     if ($automation !== undefined) {
@@ -476,7 +461,7 @@
   <div class="row mb-3">
     <div class="col d-flex justify-content-center">
       <div class="canvas-wrapper print-start-{labelProps.printDirection}">
-        <canvas bind:this={htmlCanvas}></canvas>
+        <div class="konva-stage" bind:this={htmlCanvas}></div>
       </div>
     </div>
   </div>
@@ -618,6 +603,10 @@
   }
   .canvas-wrapper canvas {
     image-rendering: pixelated;
+    display: block;
+  }
+
+  .konva-stage {
     display: block;
   }
 </style>
