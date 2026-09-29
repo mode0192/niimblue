@@ -1,4 +1,4 @@
-import * as fabric from "fabric";
+import * as fabric from "$/konva-object/compat";
 import { GRID_SIZE, OBJECT_DEFAULTS } from "$/defaults";
 import type { MoveDirection } from "$/types";
 
