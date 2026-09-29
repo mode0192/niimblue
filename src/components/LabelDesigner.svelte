@@ -180,7 +180,14 @@
     undo.push(fabricCanvas!, labelProps);
   };
 
-  const onObjectPicked = (objectType: OjectType) => {
+  const onObjectPicked = async (objectType: OjectType) => {
+    if (objectType === "image") {
+      const obj = await LabelDesignerObjectHelper.addImageWithFilePicker(fabricCanvas!);
+      fabricCanvas!.setActiveObject(obj);
+      undo.push(fabricCanvas!, labelProps);
+      return;
+    }
+
     const obj = LabelDesignerObjectHelper.addObject(fabricCanvas!, objectType);
     if (obj !== undefined) {
       fabricCanvas!.setActiveObject(obj);
@@ -197,8 +204,9 @@
     undo.push(fabricCanvas!, labelProps);
   };
 
-  const onSvgIconPicked = (i: string) => {
-    LabelDesignerObjectHelper.addSvg(fabricCanvas!, i);
+  const onSvgIconPicked = async (i: string) => {
+    const obj = await LabelDesignerObjectHelper.addSvg(fabricCanvas!, i);
+    fabricCanvas!.setActiveObject(obj);
     undo.push(fabricCanvas!, labelProps);
   };
 
