@@ -37,6 +37,7 @@ export class CustomCanvas {
   readonly backgroundLayer: Konva.Layer;
   readonly objectLayer: Konva.Layer;
   readonly overlayLayer: Konva.Layer;
+  readonly mirrorGhosts: Konva.Group;
   readonly transformer: Konva.Transformer;
 
   width: number;
@@ -67,6 +68,7 @@ export class CustomCanvas {
     this.objectLayer = new Konva.Layer();
     this.overlayLayer = new Konva.Layer();
 
+    this.mirrorGhosts = new Konva.Group({ listening: false });
     this.transformer = new Konva.Transformer({
       rotateEnabled: true,
       borderStroke: "#0d6efd",
@@ -75,7 +77,7 @@ export class CustomCanvas {
       anchorSize: 8,
       padding: 1,
     });
-    this.overlayLayer.add(this.transformer);
+    this.overlayLayer.add(this.mirrorGhosts, this.transformer);
 
     this.stage.add(this.backgroundLayer, this.objectLayer, this.overlayLayer);
     this.bindStageEvents();
@@ -340,6 +342,7 @@ export class CustomCanvas {
 
   setHighlightMirror(value: boolean): void {
     this.highlightMirror = value;
+    this.updateMirrorGhosts();
     this.requestRenderAll();
   }
 
@@ -349,6 +352,7 @@ export class CustomCanvas {
   }
 
   requestRenderAll(): void {
+    this.updateMirrorGhosts();
     this.stage.batchDraw();
   }
 
@@ -578,36 +582,87 @@ export class CustomCanvas {
     return canvas;
   }
 
+  private getMirroredPositions(object: DesignerObject): Array<{ x: number; y: number; flip: boolean }> {
+    const fold = this.getFoldInfo();
+    const result: Array<{ x: number; y: number; flip: boolean }> = [];
+
+    if (fold.axis === "none" || !["copy", "flip"].includes(this.labelProps.mirror ?? "none")) {
+      return result;
+    }
+
+    const bounds = this.getLabelBounds();
+    const center = object.getPointByOrigin("center", "center");
+
+    if (this.labelProps.mirror === "copy") {
+      for (const point of fold.points) {
+        if (fold.axis === "vertical") {
+          result.push({ x: point + (center.x - bounds.startX), y: center.y, flip: false });
+        } else {
+          result.push({ x: center.x, y: point + (center.y - bounds.startY), flip: false });
+        }
+      }
+    } else if (fold.points.length === 1) {
+      if (fold.axis === "vertical") {
+        result.push({
+          x: fold.points[0] + (fold.points[0] - center.x),
+          y: bounds.startY + bounds.endY - center.y,
+          flip: true,
+        });
+      } else {
+        result.push({
+          x: bounds.startX + bounds.endX - center.x,
+          y: fold.points[0] + (fold.points[0] - center.y),
+          flip: true,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  private updateMirrorGhosts(): void {
+    this.mirrorGhosts.destroyChildren();
+
+    if (!this.highlightMirror || this.selection.length > 1) {
+      this.overlayLayer.batchDraw();
+      return;
+    }
+
+    for (const object of this.objects) {
+      const bbox = object.getBoundingRect();
+      const center = object.getPointByOrigin("center", "center");
+      for (const mirror of this.getMirroredPositions(object)) {
+        this.mirrorGhosts.add(
+          new Konva.Rect({
+            x: mirror.x - bbox.width / 2,
+            y: mirror.y - bbox.height / 2,
+            width: bbox.width,
+            height: bbox.height,
+            fill: "rgba(0, 0, 0, 0.3)",
+            listening: false,
+          }),
+        );
+      }
+    }
+
+    this.mirrorGhosts.moveToBottom();
+    this.transformer.moveToTop();
+    this.overlayLayer.batchDraw();
+  }
+
   async createMirroredObjects(): Promise<void> {
     const fold = this.getFoldInfo();
     if (fold.axis === "none" || !["copy", "flip"].includes(this.labelProps.mirror ?? "none")) return;
 
-    const bounds = this.getLabelBounds();
     const originals = [...this.objects];
 
     for (const object of originals) {
-      const center = object.getPointByOrigin("center", "center");
-      if (this.labelProps.mirror === "copy") {
-        for (const point of fold.points) {
-          const clone = await object.clone();
-          const pos = { ...center };
-          if (fold.axis === "vertical") pos.x = point + (center.x - bounds.startX);
-          else pos.y = point + (center.y - bounds.startY);
-          clone.setPositionByOrigin(pos, "center", "center");
-          this.add(clone);
-        }
-      } else if (fold.points.length === 1) {
+      for (const mirror of this.getMirroredPositions(object)) {
         const clone = await object.clone();
-        const pos = { ...center };
-        if (fold.axis === "vertical") {
-          pos.x = fold.points[0] + (fold.points[0] - center.x);
-          pos.y = bounds.startY + bounds.endY - center.y;
-        } else {
-          pos.y = fold.points[0] + (fold.points[0] - center.y);
-          pos.x = bounds.startX + bounds.endX - center.x;
+        clone.setPositionByOrigin({ x: mirror.x, y: mirror.y }, "center", "center");
+        if (mirror.flip) {
+          clone.angle = (clone.angle + 180) % 360;
         }
-        clone.setPositionByOrigin(pos, "center", "center");
-        clone.angle = (clone.angle + 180) % 360;
         this.add(clone);
       }
     }
