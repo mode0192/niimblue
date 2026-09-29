@@ -34,8 +34,8 @@ export default defineConfig({
           }
 
           if (id.includes("node_modules")) {
-            if (id.includes("fabric")) {
-              return "lib.2.fabric";
+            if (id.includes("konva")) {
+              return "lib.2.konva";
             } else if (
               id.includes("@capacitor/filesystem") ||
               id.includes("@capacitor/share")
