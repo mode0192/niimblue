@@ -8,7 +8,7 @@
   import { Toasts } from "$/utils/toasts";
   import Dropdown from "bootstrap/js/dist/dropdown";
   import { FileUtils } from "$/utils/file_utils";
-  import * as fabric from "fabric";
+  import * as fabric from "$/konva-object/compat";
   import { Utils } from "@mmote/niimbluelib";
 
   interface Props {
