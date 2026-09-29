@@ -563,23 +563,36 @@ export class CustomCanvas {
     this.requestRenderAll();
   }
 
+  private withEditorOverlayHidden<T>(callback: () => T): T {
+    const transformerNodes = this.transformer.nodes();
+    const ghostsVisible = this.mirrorGhosts.visible();
+    this.transformer.nodes([]);
+    this.mirrorGhosts.visible(false);
+    this.overlayLayer.draw();
+
+    try {
+      return callback();
+    } finally {
+      this.transformer.nodes(transformerNodes);
+      this.mirrorGhosts.visible(ghostsVisible);
+      this.updateMirrorGhosts();
+      this.overlayLayer.draw();
+    }
+  }
+
   toDataURL(options?: { format?: string; quality?: number; multiplier?: number }): string {
     const mimeType = options?.format === "jpeg" ? "image/jpeg" : "image/png";
-    return this.stage.toDataURL({
-      mimeType,
-      quality: options?.quality,
-      pixelRatio: options?.multiplier ?? 1,
-    });
+    return this.withEditorOverlayHidden(() =>
+      this.stage.toDataURL({
+        mimeType,
+        quality: options?.quality,
+        pixelRatio: options?.multiplier ?? 1,
+      }),
+    );
   }
 
   toCanvasElement(): HTMLCanvasElement {
-    const transformerNodes = this.transformer.nodes();
-    this.transformer.nodes([]);
-    this.overlayLayer.draw();
-    const canvas = this.stage.toCanvas({ pixelRatio: 1 });
-    this.transformer.nodes(transformerNodes);
-    this.overlayLayer.draw();
-    return canvas;
+    return this.withEditorOverlayHidden(() => this.stage.toCanvas({ pixelRatio: 1 }));
   }
 
   private getMirroredPositions(object: DesignerObject): Array<{ x: number; y: number; flip: boolean }> {
