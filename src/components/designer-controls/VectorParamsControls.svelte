@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tr } from "$/utils/i18n";
   import MdIcon from "$/components/basic/MdIcon.svelte";
-  import * as fabric from "fabric";
+  import * as fabric from "$/konva-object/compat";
 
   interface Props {
     selectedObject: fabric.FabricObject;
