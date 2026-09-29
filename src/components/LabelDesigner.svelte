@@ -1,6 +1,6 @@
 <script lang="ts">
   import Dropdown from "bootstrap/js/dist/dropdown";
-  import * as fabric from "fabric";
+  import * as fabric from "$/konva-object/compat";
   import { onDestroy, onMount, tick } from "svelte";
   import { ArUcoMarker } from "$/fabric-object/aruco";
   import { Barcode } from "$/fabric-object/barcode";
