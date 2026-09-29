@@ -1,7 +1,7 @@
 <script lang="ts">
   import MdIcon from "$/components/basic/MdIcon.svelte";
   import { tr } from "$/utils/i18n";
-  import * as fabric from "fabric";
+  import * as fabric from "$/konva-object/compat";
   import { onDestroy } from "svelte";
   import QRCode from "$/fabric-object/qrcode";
   import Barcode from "$/fabric-object/barcode";
