@@ -1,5 +1,5 @@
 <script lang="ts">
-  import * as fabric from "fabric";
+  import * as fabric from "$/konva-object/compat";
   import { tr } from "$/utils/i18n";
   import QRCode from "$/fabric-object/qrcode";
   import Barcode from "$/fabric-object/barcode";
