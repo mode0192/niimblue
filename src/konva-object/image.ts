@@ -13,8 +13,10 @@ export class ImageObject extends DesignerObject {
   readonly imageNode: Konva.Image;
   src = "";
   private image?: HTMLImageElement;
+  private readonly useNaturalSize: boolean;
 
   constructor(options: Record<string, any> = {}) {
+    const hasExplicitSize = options.width !== undefined || options.height !== undefined;
     super("Image", {
       width: 64,
       height: 64,
@@ -22,6 +24,7 @@ export class ImageObject extends DesignerObject {
       fill: "transparent",
       ...options,
     });
+    this.useNaturalSize = !hasExplicitSize;
     this.src = String(options.src ?? options.data ?? "");
     this.imageNode = new Konva.Image({
       x: 0,
@@ -42,7 +45,7 @@ export class ImageObject extends DesignerObject {
     this.src = src;
     this.image = await loadImage(src);
     this.imageNode.image(this.image);
-    if (!this.width || !this.height) {
+    if (this.useNaturalSize) {
       this.setSizeRaw(this.image.naturalWidth || 64, this.image.naturalHeight || 64);
     }
     this.updateVisual();
