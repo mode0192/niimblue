@@ -169,10 +169,12 @@
 
   const onExportClicked = () => {
     try {
-      const label = onRequestLabelTemplate();
-      if (title) {
+      const label = selectedIndex === -1 ? onRequestLabelTemplate() : savedLabels[selectedIndex];
+
+      if (selectedIndex === -1 && title) {
         label.title = title.replaceAll(/[\\/:*?"<>|]/g, "_");
       }
+
       FileUtils.saveLabelAsJson(label);
     } catch (e) {
       Toasts.zodErrors(e, "Canvas save error:");
