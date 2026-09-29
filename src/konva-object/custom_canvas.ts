@@ -135,12 +135,14 @@ export class CustomCanvas {
         object.normalizeAfterTransform(this.transformer.getActiveAnchor() ?? "scale");
       }
       this.updateTransformer();
-      this.emit("object:modified", { selected: this.selection });
     });
   }
 
   private bindObject(object: DesignerObject): void {
     object.canvas = this;
+    object.on("modified", (event) => {
+      this.emit("object:modified", { target: object, ...event });
+    });
 
     object.node.on("dragmove", () => {
       const pos = object.getPointByOrigin("left", "top");
@@ -158,7 +160,6 @@ export class CustomCanvas {
 
     object.node.on("dragend", () => {
       object.emitModified({ action: "drag" });
-      this.emit("object:modified", { target: object });
     });
   }
 
