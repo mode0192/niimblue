@@ -1,5 +1,5 @@
 <script lang="ts">
-  import * as fabric from "fabric";
+  import * as fabric from "$/konva-object/compat";
   import { tr } from "$/utils/i18n";
   import { appConfig } from "$/stores";
   import MdIcon from "$/components/basic/MdIcon.svelte";
