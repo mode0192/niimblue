@@ -29,7 +29,13 @@ export class FileUtils {
   /** Convert string to base64 string */
   static base64str(str: string): string {
     const bytes = new TextEncoder().encode(str);
-    const binString = String.fromCodePoint(...bytes);
+    const chunkSize = 0x8000;
+    let binString = "";
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binString += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+
     return btoa(binString);
   }
 
@@ -183,6 +189,16 @@ export class FileUtils {
     }
 
     FileUtils.downloadBase64(filename, "application/json", FileUtils.base64obj(parsed));
+  }
+
+  /** Export all saved labels to one JSON file */
+  static saveLabelsAsJson(labels: ExportedLabelTemplate[]) {
+    const parsed = z.array(ExportedLabelTemplateSchema.omit({ id: true })).parse(labels);
+    FileUtils.downloadBase64(
+      `labels_${FileUtils.timestamp()}.json`,
+      "application/json",
+      FileUtils.base64obj(parsed),
+    );
   }
 
   /** Convert canvas to PNG and download it */
