@@ -134,10 +134,22 @@
     try {
       const contents = await FileUtils.pickAndReadSingleTextFile("json");
       const rawData = JSON.parse(contents);
-      const label = ExportedLabelTemplateSchema.parse(rawData);
 
-      const result = [...savedLabels, label];
-      const { zodErrors, otherErrors } = LocalStoragePersistence.saveLabels(result);
+      const collectionResult = z.array(ExportedLabelTemplateSchema.omit({ id: true })).safeParse(rawData);
+
+      let labelsToSave: ExportedLabelTemplate[];
+      if (collectionResult.success) {
+        if (!confirm($tr("params.saved_labels.warning.import"))) {
+          return;
+        }
+        labelsToSave = collectionResult.data;
+      } else {
+        // Backward compatibility with older single-label JSON exports.
+        const label = ExportedLabelTemplateSchema.parse(rawData);
+        labelsToSave = [...savedLabels, label];
+      }
+
+      const { zodErrors, otherErrors } = LocalStoragePersistence.saveLabels(labelsToSave);
 
       zodErrors.forEach((e) => Toasts.zodErrors(e, "Label import error:"));
       otherErrors.forEach((e) => Toasts.error(e));
@@ -147,16 +159,8 @@
       }
 
       savedLabels = LocalStoragePersistence.loadLabels();
-
       selectedIndex = -1;
-      for (let i = savedLabels.length - 1; i >= 0; i--) {
-        if (savedLabels[i].timestamp === label.timestamp) {
-          selectedIndex = i;
-          break;
-        }
-      }
-
-      title = selectedIndex === -1 ? "" : (savedLabels[selectedIndex]?.title ?? "");
+      title = "";
       calcUsedSpace();
     } catch (e) {
       if (e instanceof z.ZodError) {
@@ -169,15 +173,13 @@
 
   const onExportClicked = () => {
     try {
-      const label = selectedIndex === -1 ? onRequestLabelTemplate() : savedLabels[selectedIndex];
-
-      if (selectedIndex === -1 && title) {
-        label.title = title.replaceAll(/[\\/:*?"<>|]/g, "_");
-      }
-
-      FileUtils.saveLabelAsJson(label);
+      FileUtils.saveLabelsAsJson(savedLabels);
     } catch (e) {
-      Toasts.zodErrors(e, "Canvas save error:");
+      if (e instanceof z.ZodError) {
+        Toasts.zodErrors(e, "Labels export error:");
+      } else {
+        Toasts.error(e);
+      }
     }
   };
 
