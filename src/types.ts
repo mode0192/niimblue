@@ -1,5 +1,4 @@
 import { LabelType, printTaskNames } from "@mmote/niimbluelib";
-import * as fabric from "$/konva-object/compat";
 import { z } from "zod";
 
 export type ConnectionState = "connecting" | "connected" | "disconnected";
@@ -21,10 +20,10 @@ export const CsvParamsSchema = z.object({
   data: z.string(),
 });
 
-/** Not validated */
-export const FabricObjectSchema = z.custom<fabric.FabricObject>((val: any): boolean => {
-  return typeof val === "object";
-});
+/** Canvas objects are validated by their object factory during loading. */
+export const FabricObjectSchema = z.custom<Record<string, unknown>>(
+  (val): val is Record<string, unknown> => typeof val === "object" && val !== null,
+);
 
 export const LabelPropsSchema = z.object({
   printDirection: z.enum(["left", "top"]),
@@ -57,6 +56,7 @@ export const LabelPresetSchema = z.object({
 
 export const FabricJsonSchema = z.object({
   version: z.string(),
+  engine: z.enum(["konva"]).optional(),
   objects: z.array(FabricObjectSchema),
 });
 
