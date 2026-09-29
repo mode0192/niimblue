@@ -609,11 +609,6 @@
   .canvas-wrapper.print-start-top {
     border-top: 2px solid #ff4646;
   }
-  .canvas-wrapper canvas {
-    image-rendering: pixelated;
-    display: block;
-  }
-
   .konva-stage {
     display: block;
   }
