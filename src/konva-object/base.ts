@@ -259,6 +259,11 @@ export abstract class DesignerObject {
     return { left: rect.x, top: rect.y, width: rect.width, height: rect.height };
   }
 
+  scale(value: number): void {
+    this.scaleX = value;
+    this.scaleY = value;
+  }
+
   scaleToWidth(width: number): void {
     const scale = width / Math.max(1, this.width);
     this.scaleX = scale;
