@@ -1,4 +1,4 @@
-import * as fabric from "fabric";
+import * as fabric from "$/konva-object/compat";
 import ArUcoMarker from "$/fabric-object/aruco";
 import Barcode from "$/fabric-object/barcode";
 import QRCode from "$/fabric-object/qrcode";
