@@ -21,9 +21,9 @@ export const createObjectFromData = async (raw: Record<string, any>): Promise<De
     return new CircleObject(raw);
   }
   if (legacyType === "line" || legacyType === "polyline") {
-    const points = Array.isArray(raw.points) ? raw.points : undefined;
+    const points: any[] = Array.isArray(raw.points) ? raw.points : [];
     const options = { ...raw };
-    if (points?.length >= 2) {
+    if (points.length >= 2) {
       const xs = points.map((p: any) => Number(p.x ?? 0));
       const ys = points.map((p: any) => Number(p.y ?? 0));
       options.width = Math.max(1, Math.max(...xs) - Math.min(...xs));
