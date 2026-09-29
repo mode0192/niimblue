@@ -1,5 +1,5 @@
 import { LabelType, printTaskNames } from "@mmote/niimbluelib";
-import * as fabric from "fabric";
+import * as fabric from "$/konva-object/compat";
 import { z } from "zod";
 
 export type ConnectionState = "connecting" | "connected" | "disconnected";
