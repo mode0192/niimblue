@@ -128,6 +128,7 @@
     "params.saved_labels.save.browser.replace": "Save (replace)",
     "params.saved_labels.save.browser": "Save",
     "params.saved_labels.save.json": "Export",
+    "params.saved_labels.save.json.all": "Export all",
     "params.saved_labels.save.url": "Copy link",
     "params.saved_labels.load.url.warn": "Load label from URL? Here be dragons.",
     "params.saved_labels.load.url.loaded": "Label loaded from URL",
