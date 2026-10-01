@@ -122,6 +122,50 @@ export class TextboxExt<
    * Backport Fabric.js #10993 for RTL cursor hit-testing.
    * Fabric 7.4.0 compares RTL pointer coordinates in the wrong coordinate space.
    */
+  override _measureLine(lineIndex: number) {
+    const result = super._measureLine(lineIndex);
+
+    if (
+      this.direction !== "rtl" ||
+      this.charSpacing !== 0 ||
+      !this.isEmptyStyles(lineIndex) ||
+      typeof document === "undefined"
+    ) {
+      return result;
+    }
+
+    const line = this._textLines[lineIndex];
+    if (!line.length) {
+      return result;
+    }
+
+    const span = document.createElement("span");
+    span.dir = "rtl";
+    span.style.cssText =
+      "position:fixed;left:-99999px;top:-99999px;white-space:pre;visibility:hidden;";
+    span.style.font = this._getFontDeclaration(this.getCompleteStyleDeclaration(lineIndex, 0));
+    span.textContent = line.join("");
+    document.body.appendChild(span);
+
+    const node = span.firstChild as Text;
+    const range = document.createRange();
+    const right = span.getBoundingClientRect().right;
+    let offset = 0;
+
+    for (let i = 0; i <= line.length; i++) {
+      if (i > 0) {
+        offset += line[i - 1].length;
+      }
+      range.setStart(node, offset);
+      range.collapse(true);
+      this.__charBounds[lineIndex][i].left =
+        right - range.getBoundingClientRect().left;
+    }
+
+    span.remove();
+    return result;
+  }
+
   override getSelectionStartFromPointer(e: fabric.TPointerEvent): number {
     if (this.direction !== "rtl") {
       return super.getSelectionStartFromPointer(e);
