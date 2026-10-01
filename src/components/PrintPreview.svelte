@@ -27,7 +27,6 @@
   import { Toasts } from "$/utils/toasts";
   import { CustomCanvas } from "$/fabric-object/custom_canvas";
   import { FileUtils } from "$/utils/file_utils";
-  import { CanvasUtils } from "$/utils/canvas_utils";
   import AppModal from "$/components/basic/AppModal.svelte";
 
   interface Props {
@@ -154,22 +153,47 @@
         let printCanvas = previewCanvas;
 
         if ($printerMeta !== undefined) {
-          const printImage = previewContext.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-          const printableWidth =
-            labelProps.printDirection === "top"
-              ? Math.min(printImage.width, $printerMeta.printheadPixels)
-              : printImage.width;
-          const printableHeight =
-            labelProps.printDirection === "left"
-              ? Math.min(printImage.height, $printerMeta.printheadPixels)
-              : printImage.height;
-          const croppedImage = CanvasUtils.centerCropImageData(printImage, printableWidth, printableHeight);
+          const headPixels = $printerMeta.printheadPixels;
+          const originalHeadSize =
+            labelProps.printDirection === "left" ? originalImage.height : originalImage.width;
 
-          if (croppedImage !== printImage) {
+          if (originalHeadSize > headPixels) {
+            const axisOffset = labelProps.printDirection === "left" ? offset.y : offset.x;
+            const outerNegativePadding = offset.offsetType === "outer" ? Math.max(-axisOffset, 0) : 0;
+            const cropStart = Math.floor((originalHeadSize - headPixels) / 2) + outerNegativePadding;
+
             printCanvas = document.createElement("canvas");
-            printCanvas.width = croppedImage.width;
-            printCanvas.height = croppedImage.height;
-            printCanvas.getContext("2d")!.putImageData(croppedImage, 0, 0);
+            const printContext = printCanvas.getContext("2d")!;
+
+            if (labelProps.printDirection === "top") {
+              printCanvas.width = headPixels;
+              printCanvas.height = previewCanvas.height;
+              printContext.drawImage(
+                previewCanvas,
+                cropStart,
+                0,
+                headPixels,
+                previewCanvas.height,
+                0,
+                0,
+                headPixels,
+                previewCanvas.height,
+              );
+            } else {
+              printCanvas.width = previewCanvas.width;
+              printCanvas.height = headPixels;
+              printContext.drawImage(
+                previewCanvas,
+                0,
+                cropStart,
+                previewCanvas.width,
+                headPixels,
+                0,
+                0,
+                previewCanvas.width,
+                headPixels,
+              );
+            }
           }
         }
 
