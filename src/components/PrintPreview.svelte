@@ -168,22 +168,11 @@
             const sourceY = labelProps.printDirection === "left" ? cropStart : 0;
             const sourceWidth = labelProps.printDirection === "top" ? headPixels : previewCanvas.width;
             const sourceHeight = labelProps.printDirection === "left" ? headPixels : previewCanvas.height;
+            const croppedImage = previewContext.getImageData(sourceX, sourceY, sourceWidth, sourceHeight);
 
             printCanvas.width = sourceWidth;
             printCanvas.height = sourceHeight;
-            printCanvas
-              .getContext("2d")!
-              .drawImage(
-                previewCanvas,
-                sourceX,
-                sourceY,
-                sourceWidth,
-                sourceHeight,
-                0,
-                0,
-                sourceWidth,
-                sourceHeight,
-              );
+            printCanvas.getContext("2d")!.putImageData(croppedImage, 0, 0);
           }
         }
 
