@@ -27,6 +27,7 @@
   import { Toasts } from "$/utils/toasts";
   import { CustomCanvas } from "$/fabric-object/custom_canvas";
   import { FileUtils } from "$/utils/file_utils";
+  import { CanvasUtils } from "$/utils/canvas_utils";
   import AppModal from "$/components/basic/AppModal.svelte";
 
   interface Props {
@@ -345,6 +346,19 @@
     previewCanvas.height = preRenderedCanvas.height;
     previewContext = previewCanvas.getContext("2d")!;
     originalImage = ctx.getImageData(0, 0, preRenderedCanvas.width, preRenderedCanvas.height);
+
+    if ($printerMeta !== undefined) {
+      const printableWidth =
+        labelProps.printDirection === "top"
+          ? Math.min(originalImage.width, $printerMeta.printheadPixels)
+          : originalImage.width;
+      const printableHeight =
+        labelProps.printDirection === "left"
+          ? Math.min(originalImage.height, $printerMeta.printheadPixels)
+          : originalImage.height;
+
+      originalImage = CanvasUtils.centerCropImageData(originalImage, printableWidth, printableHeight);
+    }
 
     updatePreview();
 
