@@ -156,11 +156,14 @@
           const headPixels = $printerMeta.printheadPixels;
           const originalHeadSize =
             labelProps.printDirection === "left" ? originalImage.height : originalImage.width;
+          const previewHeadSize =
+            labelProps.printDirection === "left" ? previewCanvas.height : previewCanvas.width;
 
-          if (originalHeadSize > headPixels) {
+          if (previewHeadSize > headPixels) {
             const axisOffset = labelProps.printDirection === "left" ? offset.y : offset.x;
+            const centeredCropStart = Math.floor(Math.max(originalHeadSize - headPixels, 0) / 2);
             const outerNegativePadding = offset.offsetType === "outer" ? Math.max(-axisOffset, 0) : 0;
-            const cropStart = Math.floor((originalHeadSize - headPixels) / 2) + outerNegativePadding;
+            const cropStart = centeredCropStart + outerNegativePadding;
 
             printCanvas = document.createElement("canvas");
 
