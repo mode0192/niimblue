@@ -89,28 +89,6 @@ export class CanvasUtils {
     canvas.requestRenderAll();
   }
 
-  static centerCropImageData(source: ImageData, width: number, height: number): ImageData {
-    const targetWidth = Math.max(1, Math.min(source.width, Math.floor(width)));
-    const targetHeight = Math.max(1, Math.min(source.height, Math.floor(height)));
-
-    if (targetWidth === source.width && targetHeight === source.height) {
-      return source;
-    }
-
-    const sourceX = Math.floor((source.width - targetWidth) / 2);
-    const sourceY = Math.floor((source.height - targetHeight) / 2);
-    const result = new ImageData(targetWidth, targetHeight);
-    const rowLength = targetWidth * 4;
-
-    for (let y = 0; y < targetHeight; y++) {
-      const sourceStart = ((sourceY + y) * source.width + sourceX) * 4;
-      const targetStart = y * rowLength;
-      result.data.set(source.data.subarray(sourceStart, sourceStart + rowLength), targetStart);
-    }
-
-    return result;
-  }
-
   static renderError(ctx: CanvasRenderingContext2D, width: number, height: number): void {
       ctx.save();
       ctx.fillStyle = "black";
