@@ -152,7 +152,7 @@
 
   const onUpdateLabelProps = (newProps: LabelProps) => {
     labelProps = newProps;
-    fabricCanvas!.setDimensions(labelProps.size);
+    CanvasUtils.resizeAroundCenter(fabricCanvas!, labelProps.size);
     fabricCanvas!.virtualZoom(fabricCanvas!.getVirtualZoom());
     try {
       LocalStoragePersistence.saveLastLabelProps(labelProps);
