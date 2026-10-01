@@ -150,8 +150,37 @@
         currentPage = pageIdx;
         console.log("Printing page", currentPage);
         await generatePreviewData(currentPage);
+        let printCanvas = previewCanvas;
+
+        if ($printerMeta !== undefined) {
+          const headPixels = $printerMeta.printheadPixels;
+          const originalHeadSize =
+            labelProps.printDirection === "left" ? originalImage.height : originalImage.width;
+          const previewHeadSize =
+            labelProps.printDirection === "left" ? previewCanvas.height : previewCanvas.width;
+
+          if (previewHeadSize > headPixels) {
+            const axisOffset = labelProps.printDirection === "left" ? offset.y : offset.x;
+            const centeredCropStart = Math.floor(Math.max(originalHeadSize - headPixels, 0) / 2);
+            const outerNegativePadding = offset.offsetType === "outer" ? Math.max(-axisOffset, 0) : 0;
+            const cropStart = centeredCropStart + outerNegativePadding;
+
+            printCanvas = document.createElement("canvas");
+
+            const sourceX = labelProps.printDirection === "top" ? cropStart : 0;
+            const sourceY = labelProps.printDirection === "left" ? cropStart : 0;
+            const sourceWidth = labelProps.printDirection === "top" ? headPixels : previewCanvas.width;
+            const sourceHeight = labelProps.printDirection === "left" ? headPixels : previewCanvas.height;
+            const croppedImage = previewContext.getImageData(sourceX, sourceY, sourceWidth, sourceHeight);
+
+            printCanvas.width = sourceWidth;
+            printCanvas.height = sourceHeight;
+            printCanvas.getContext("2d")!.putImageData(croppedImage, 0, 0);
+          }
+        }
+
         const encoded: EncodedImage = ImageEncoder.encodeCanvas(
-          previewCanvas,
+          printCanvas,
           opts.pageColor!,
           labelProps.printDirection,
         );
