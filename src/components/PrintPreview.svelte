@@ -151,8 +151,30 @@
         currentPage = pageIdx;
         console.log("Printing page", currentPage);
         await generatePreviewData(currentPage);
+        let printCanvas = previewCanvas;
+
+        if ($printerMeta !== undefined) {
+          const printImage = previewContext.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+          const printableWidth =
+            labelProps.printDirection === "top"
+              ? Math.min(printImage.width, $printerMeta.printheadPixels)
+              : printImage.width;
+          const printableHeight =
+            labelProps.printDirection === "left"
+              ? Math.min(printImage.height, $printerMeta.printheadPixels)
+              : printImage.height;
+          const croppedImage = CanvasUtils.centerCropImageData(printImage, printableWidth, printableHeight);
+
+          if (croppedImage !== printImage) {
+            printCanvas = document.createElement("canvas");
+            printCanvas.width = croppedImage.width;
+            printCanvas.height = croppedImage.height;
+            printCanvas.getContext("2d")!.putImageData(croppedImage, 0, 0);
+          }
+        }
+
         const encoded: EncodedImage = ImageEncoder.encodeCanvas(
-          previewCanvas,
+          printCanvas,
           opts.pageColor!,
           labelProps.printDirection,
         );
@@ -346,19 +368,6 @@
     previewCanvas.height = preRenderedCanvas.height;
     previewContext = previewCanvas.getContext("2d")!;
     originalImage = ctx.getImageData(0, 0, preRenderedCanvas.width, preRenderedCanvas.height);
-
-    if ($printerMeta !== undefined) {
-      const printableWidth =
-        labelProps.printDirection === "top"
-          ? Math.min(originalImage.width, $printerMeta.printheadPixels)
-          : originalImage.width;
-      const printableHeight =
-        labelProps.printDirection === "left"
-          ? Math.min(originalImage.height, $printerMeta.printheadPixels)
-          : originalImage.height;
-
-      originalImage = CanvasUtils.centerCropImageData(originalImage, printableWidth, printableHeight);
-    }
 
     updatePreview();
 
