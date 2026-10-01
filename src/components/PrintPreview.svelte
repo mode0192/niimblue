@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { derived } from "svelte/store";
-  import { connectionState, printerClient, printerMeta } from "$/stores";
+  import { connectionState, printerClient, printerInfo, printerMeta } from "$/stores";
   import * as effects from "$/utils/post_process";
   import {
     type EncodedImage,
@@ -74,6 +74,9 @@
   let modalRef: AppModal;
 
   const disconnected = derived(connectionState, ($connectionState) => $connectionState !== "connected");
+
+  const getPrintheadPixels = (): number | undefined =>
+    $printerInfo?.printheadWidth ?? $printerMeta?.printheadPixels;
 
   const labelTypeTranslationKey = (labelType: string): TranslationKey =>
     `preview.label_type.${labelType}` as TranslationKey;
@@ -152,8 +155,9 @@
         await generatePreviewData(currentPage);
         let printCanvas = previewCanvas;
 
-        if ($printerMeta !== undefined) {
-          const headPixels = $printerMeta.printheadPixels;
+        const headPixels = getPrintheadPixels();
+
+        if (headPixels !== undefined) {
           const originalHeadSize =
             labelProps.printDirection === "left" ? originalImage.height : originalImage.width;
           const previewHeadSize =
@@ -258,11 +262,13 @@
       previewContext.putImageData(iData, Math.max(offset.x, 0), Math.max(offset.y, 0));
     }
 
-    if ($printerMeta !== undefined) {
+    const headPixels = getPrintheadPixels();
+
+    if (headPixels !== undefined) {
       const headSize = labelProps.printDirection == "left" ? previewCanvas.height : previewCanvas.width;
-      if (headSize > $printerMeta.printheadPixels) {
+      if (headSize > headPixels) {
         offsetWarning += $tr("params.label.warning.width") + " ";
-        offsetWarning += `(${headSize} > ${$printerMeta.printheadPixels})`;
+        offsetWarning += `(${headSize} > ${headPixels})`;
         offsetWarning += "\n";
       }
     }
