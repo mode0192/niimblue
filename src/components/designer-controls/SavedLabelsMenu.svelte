@@ -137,31 +137,45 @@
 
       const collectionResult = z.array(ExportedLabelTemplateSchema.omit({ id: true })).safeParse(rawData);
 
-      let labelsToSave: ExportedLabelTemplate[];
       if (collectionResult.success) {
         if (!confirm($tr("params.saved_labels.warning.import"))) {
           return;
         }
-        labelsToSave = collectionResult.data;
-      } else {
-        // Backward compatibility with older single-label JSON exports.
-        const label = ExportedLabelTemplateSchema.parse(rawData);
-        labelsToSave = [...savedLabels, label];
-      }
 
-      const { zodErrors, otherErrors } = LocalStoragePersistence.saveLabels(labelsToSave);
+        const { zodErrors, otherErrors } = LocalStoragePersistence.saveLabels(collectionResult.data);
 
-      zodErrors.forEach((e) => Toasts.zodErrors(e, "Label import error:"));
-      otherErrors.forEach((e) => Toasts.error(e));
+        zodErrors.forEach((e) => Toasts.zodErrors(e, "Label import error:"));
+        otherErrors.forEach((e) => Toasts.error(e));
 
-      if (zodErrors.length !== 0 || otherErrors.length !== 0) {
+        if (zodErrors.length !== 0 || otherErrors.length !== 0) {
+          return;
+        }
+
+        savedLabels = LocalStoragePersistence.loadLabels();
+        selectedIndex = -1;
+        title = "";
+        calcUsedSpace();
         return;
       }
 
-      savedLabels = LocalStoragePersistence.loadLabels();
-      selectedIndex = -1;
-      title = "";
-      calcUsedSpace();
+      const label = ExportedLabelTemplateSchema.parse(rawData);
+
+      let message = $tr("editor.warning.load");
+      if (label.csv) {
+        message += "\n" + $tr("editor.warning.load.csv");
+      }
+
+      if (!confirm(message)) {
+        return;
+      }
+
+      onLoadRequested(label);
+
+      if (label.title) {
+        title = label.title;
+      }
+
+      new Dropdown(dropdownRef).hide();
     } catch (e) {
       if (e instanceof z.ZodError) {
         Toasts.zodErrors(e, "Label import error:");
@@ -172,6 +186,18 @@
   };
 
   const onExportClicked = () => {
+    try {
+      const label = onRequestLabelTemplate();
+      if (title) {
+        label.title = title.replaceAll(/[\\/:*?"<>|]/g, "_");
+      }
+      FileUtils.saveLabelAsJson(label);
+    } catch (e) {
+      Toasts.zodErrors(e, "Canvas save error:");
+    }
+  };
+
+  const onExportAllClicked = () => {
     try {
       FileUtils.saveLabelsAsJson(savedLabels);
     } catch (e) {
@@ -248,6 +274,12 @@
             data-bs-toggle="dropdown">
           </button>
           <ul class="dropdown-menu">
+            <li>
+              <button class="dropdown-item" onclick={onExportAllClicked}>
+                {$tr("params.saved_labels.save.json.all")}
+              </button>
+            </li>
+            <li><hr class="dropdown-divider" /></li>
             <li>
               <button class="dropdown-item" onclick={onExportPngClicked}>PNG</button>
             </li>
