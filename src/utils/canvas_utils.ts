@@ -59,6 +59,38 @@ export class CanvasUtils {
     canvas.centerObjectH(obj);
   }
 
+  static resizeAroundCenter(canvas: fabric.Canvas, size: { width: number; height: number }): void {
+    // Keep objects on the pixel grid. For odd size differences the extra
+    // pixel stays on the right/bottom side instead of moving objects by 0.5 px.
+    const dx = Math.trunc((size.width - canvas.getWidth()) / 2);
+    const dy = Math.trunc((size.height - canvas.getHeight()) / 2);
+
+    if (dx !== 0 || dy !== 0) {
+      const activeObject = canvas.getActiveObject();
+      const activeSelection = activeObject instanceof fabric.ActiveSelection ? activeObject : undefined;
+      const activeSelectionObjects = new Set(activeSelection?.getObjects() ?? []);
+
+      const translate = (obj: fabric.FabricObject) => {
+        const position = obj.getXY();
+        obj.setXY(new fabric.Point(position.x + dx, position.y + dy));
+        obj.setCoords();
+      };
+
+      canvas.getObjects().forEach((obj) => {
+        if (!activeSelectionObjects.has(obj)) {
+          translate(obj);
+        }
+      });
+
+      if (activeSelection) {
+        translate(activeSelection);
+      }
+    }
+
+    canvas.setDimensions(size);
+    canvas.requestRenderAll();
+  }
+
   static renderError(ctx: CanvasRenderingContext2D, width: number, height: number): void {
       ctx.save();
       ctx.fillStyle = "black";
