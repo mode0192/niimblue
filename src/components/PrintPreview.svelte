@@ -163,37 +163,27 @@
             const cropStart = Math.floor((originalHeadSize - headPixels) / 2) + outerNegativePadding;
 
             printCanvas = document.createElement("canvas");
-            const printContext = printCanvas.getContext("2d")!;
 
-            if (labelProps.printDirection === "top") {
-              printCanvas.width = headPixels;
-              printCanvas.height = previewCanvas.height;
-              printContext.drawImage(
+            const sourceX = labelProps.printDirection === "top" ? cropStart : 0;
+            const sourceY = labelProps.printDirection === "left" ? cropStart : 0;
+            const sourceWidth = labelProps.printDirection === "top" ? headPixels : previewCanvas.width;
+            const sourceHeight = labelProps.printDirection === "left" ? headPixels : previewCanvas.height;
+
+            printCanvas.width = sourceWidth;
+            printCanvas.height = sourceHeight;
+            printCanvas
+              .getContext("2d")!
+              .drawImage(
                 previewCanvas,
-                cropStart,
+                sourceX,
+                sourceY,
+                sourceWidth,
+                sourceHeight,
                 0,
-                headPixels,
-                previewCanvas.height,
                 0,
-                0,
-                headPixels,
-                previewCanvas.height,
+                sourceWidth,
+                sourceHeight,
               );
-            } else {
-              printCanvas.width = previewCanvas.width;
-              printCanvas.height = headPixels;
-              printContext.drawImage(
-                previewCanvas,
-                0,
-                cropStart,
-                previewCanvas.width,
-                headPixels,
-                0,
-                0,
-                previewCanvas.width,
-                headPixels,
-              );
-            }
           }
         }
 
