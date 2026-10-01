@@ -60,8 +60,10 @@ export class CanvasUtils {
   }
 
   static resizeAroundCenter(canvas: fabric.Canvas, size: { width: number; height: number }): void {
-    const dx = (size.width - canvas.getWidth()) / 2;
-    const dy = (size.height - canvas.getHeight()) / 2;
+    // Keep objects on the pixel grid. For odd size differences the extra
+    // pixel stays on the right/bottom side instead of moving objects by 0.5 px.
+    const dx = Math.trunc((size.width - canvas.getWidth()) / 2);
+    const dy = Math.trunc((size.height - canvas.getHeight()) / 2);
 
     if (dx !== 0 || dy !== 0) {
       const activeObject = canvas.getActiveObject();
