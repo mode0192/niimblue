@@ -6,7 +6,9 @@ import "bootstrap/js/dist/collapse";
 import App from "$/App.svelte";
 import { mount } from "svelte";
 import { configureFabric } from "$/defaults";
+import { installBackgroundSafeProtocolTiming } from "$/utils/protocol_timing";
 
+installBackgroundSafeProtocolTiming();
 configureFabric();
 
 const app = mount(App, {
