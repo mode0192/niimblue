@@ -7,6 +7,11 @@ export const configureFabric = () => {
 
   fabric.classRegistry.setClass(TextboxExt, "Textbox");
 
+  // Redraw objects on every step of a resize drag. By default Fabric keeps the old cached picture until
+  // the mouse is released: scaled shapes (circle, image, SVG) look pixelated, and rect/QR/ArUco lose
+  // the newly added part when enlarged.
+  fabric.FabricObject.ownDefaults.noScaleCache = false;
+
   // "Keep aspect ratio" choice is saved with the object (undo/redo, save/load, clone).
   fabric.FabricObject.customProperties = [...fabric.FabricObject.customProperties, "lockAspectRatio"];
 
