@@ -24,6 +24,11 @@ export class CanvasUtils {
     return "scaled";
   }
 
+  /** The Line tool creates a Polyline (old saved Lines are converted to one on load). */
+  static isLine(obj: fabric.FabricObject): boolean {
+    return obj instanceof fabric.Line || obj instanceof fabric.Polyline;
+  }
+
   /** Squares have a minimum size and an even side length (avoids half-pixel rendering). */
   static normalizeSquareSize(size: number): number {
     const rounded = Math.max(Math.round(size), CanvasUtils.SQUARE_MIN_SIZE);

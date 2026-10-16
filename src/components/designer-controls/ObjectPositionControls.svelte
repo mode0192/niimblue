@@ -23,7 +23,7 @@
 
   const sizeKind = $derived(CanvasUtils.getSizeKind(selectedObject));
   // A line has no aspect ratio to keep.
-  const canKeepAspect = $derived(sizeKind === "scaled" && !(selectedObject instanceof fabric.Line));
+  const canKeepAspect = $derived(sizeKind === "scaled" && !CanvasUtils.isLine(selectedObject));
 
   const objectDimensionsChanged = (e?: fabric.ModifiedEvent) => {
     const pos = selectedObject.getPointByOrigin("left", "top");
