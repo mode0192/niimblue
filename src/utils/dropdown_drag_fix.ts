@@ -1,32 +1,19 @@
 /**
- * Bootstrap closes a dropdown on any click that is not on an input. If a press starts in a text field
- * inside the menu (e.g. selecting text) and is released on another element, the browser fires `click` on
- * the common ancestor, which Bootstrap treats as a real click. Swallow that click before Bootstrap sees it.
+ * Bootstrap closes a dropdown on any click outside of it. When a press starts inside the menu (e.g. selecting
+ * text in a field) and is released outside, the browser fires that click on a common ancestor, outside the
+ * menu. Swallow it before Bootstrap sees it. Keyboard clicks (detail 0) are not affected.
  */
 export const preventDropdownCloseOnDragRelease = () => {
-  const MENU = ".dropdown-menu";
-  const TEXT_FIELD = "input, textarea, select, [contenteditable='true']";
-  let pressTarget: Element | null = null;
+  const inMenu = (target: EventTarget | null) => target instanceof Element && target.closest(".dropdown-menu") !== null;
+  let pressedInMenu = false;
 
-  document.addEventListener(
-    "pointerdown",
-    (e) => {
-      const t = e.target instanceof Element ? e.target : null;
-      pressTarget = t !== null && t.closest(MENU) !== null && t.closest(TEXT_FIELD) !== null ? t : null;
-    },
-    true,
-  );
-
-  // a keyboard-triggered click has no pointerdown, so don't let a stale press swallow it
-  document.addEventListener("keydown", () => (pressTarget = null), true);
+  document.addEventListener("pointerdown", (e) => (pressedInMenu = inMenu(e.target)), true);
 
   document.addEventListener(
     "click",
     (e) => {
-      if (pressTarget !== null && e.target !== pressTarget) {
-        e.stopPropagation();
-      }
-      pressTarget = null;
+      if (pressedInMenu && e.detail > 0 && !inMenu(e.target)) e.stopPropagation();
+      pressedInMenu = false;
     },
     true,
   );
