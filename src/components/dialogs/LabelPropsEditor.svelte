@@ -16,6 +16,7 @@
   import { DEFAULT_LABEL_PRESETS } from "$/defaults";
   import { onMount, tick } from "svelte";
   import { LocalStoragePersistence } from "$/utils/persistence";
+  import { ensurePresetIds, makePresetId } from "$/utils/preset_ids";
   import type { PrintDirection } from "@mmote/niimbluelib";
   import MdIcon from "$/components/basic/MdIcon.svelte";
   import { Toasts } from "$/utils/toasts";
@@ -122,7 +123,16 @@
       tailLength: Math.floor(newTailLength),
       mirror,
       offset: hasPresetOffset ? { ...offset } : undefined,
+      presetId: labelPresets[selectedPresetIndex]?.id,
     });
+  };
+
+  /** Index of the preset the current label was applied from, or -1 (e.g. preset was deleted). */
+  const findPresetIndexById = (presetId: string | undefined): number => {
+    if (presetId === undefined) {
+      return -1;
+    }
+    return labelPresets.findIndex((preset) => preset.id === presetId);
   };
 
   const onLabelPresetSelected = (index: number) => {
@@ -186,7 +196,8 @@
     hasPresetOffset = true;
   };
 
-  const makeLabelPreset = (): LabelPreset => ({
+  const makeLabelPreset = (id: string = makePresetId()): LabelPreset => ({
+    id,
     dpmm,
     printDirection,
     unit,
@@ -230,7 +241,7 @@
     }
 
     const newPresets = [...labelPresets];
-    newPresets[selectedPresetIndex] = makeLabelPreset();
+    newPresets[selectedPresetIndex] = makeLabelPreset(newPresets[selectedPresetIndex].id);
 
     try {
       LocalStoragePersistence.saveLabelPresets(newPresets);
@@ -273,6 +284,10 @@
     mirror = labelProps.mirror ?? "none";
     hasPresetOffset = labelProps.offset !== undefined;
     offset = labelProps.offset !== undefined ? { ...labelProps.offset } : getFallbackOffset();
+    selectedPresetIndex = findPresetIndexById(labelProps.presetId);
+    if (selectedPresetIndex !== -1) {
+      title = labelPresets[selectedPresetIndex].title ?? "";
+    }
     onUnitChange();
   };
 
@@ -287,7 +302,7 @@
         return;
       }
 
-      const presets = [...labelPresets, ...items];
+      const presets = ensurePresetIds([...labelPresets, ...items]).presets;
       LocalStoragePersistence.saveLabelPresets(presets);
       labelPresets = presets;
       selectedPresetIndex = -1;
@@ -326,7 +341,13 @@
     try {
       const savedPresets: LabelPreset[] | null = LocalStoragePersistence.loadLabelPresets();
       if (savedPresets !== null) {
-        labelPresets = savedPresets;
+        const withIds = ensurePresetIds(savedPresets);
+        labelPresets = withIds.presets;
+
+        // presets saved before ids existed get their ids stored once
+        if (withIds.changed) {
+          LocalStoragePersistence.saveLabelPresets(withIds.presets);
+        }
       }
     } catch (e) {
       Toasts.zodErrors(e, "Presets load error:");

@@ -29,11 +29,29 @@ export const configureFabric = () => {
 /** Default presets for LabelPropsEditor */
 export const DEFAULT_LABEL_PRESETS: LabelPreset[] = [
   // 203dpi
-  { width: 40, height: 12, unit: "mm", dpmm: 8, printDirection: "left", shape: "rect" },
-  { width: 50, height: 30, unit: "mm", dpmm: 8, printDirection: "top", shape: "rect" },
+  { id: "default-40x12-203", width: 40, height: 12, unit: "mm", dpmm: 8, printDirection: "left", shape: "rect" },
+  { id: "default-50x30-203", width: 50, height: 30, unit: "mm", dpmm: 8, printDirection: "top", shape: "rect" },
   // 300dpi
-  { width: 40, height: 12, unit: "mm", dpmm: 11.81, printDirection: "left", shape: "rect", title: "40x12mm 300dpi" },
-  { width: 50, height: 30, unit: "mm", dpmm: 11.81, printDirection: "top", shape: "rect", title: "50x30mm 300dpi" },
+  {
+    id: "default-40x12-300",
+    width: 40,
+    height: 12,
+    unit: "mm",
+    dpmm: 11.81,
+    printDirection: "left",
+    shape: "rect",
+    title: "40x12mm 300dpi",
+  },
+  {
+    id: "default-50x30-300",
+    width: 50,
+    height: 30,
+    unit: "mm",
+    dpmm: 11.81,
+    printDirection: "top",
+    shape: "rect",
+    title: "50x30mm 300dpi",
+  },
 ];
 
 /** Default canvas dimensions */

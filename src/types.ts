@@ -45,9 +45,13 @@ export const LabelPropsSchema = z.object({
   tailLength: z.number().default(0).optional(),
   mirror: z.enum(["none", "copy", "flip"]).default("none").optional(),
   offset: PreviewPropsOffsetSchema.optional(),
+  /** Id of the label preset this label was applied from. Used to show the selected preset in the editor. */
+  presetId: z.string().optional(),
 });
 
 export const LabelPresetSchema = z.object({
+  /** Stable preset identifier, assigned on load/import when missing. */
+  id: z.string().optional(),
   width: z.number().positive(),
   height: z.number().positive(),
   unit: z.enum(["mm", "px"]),
