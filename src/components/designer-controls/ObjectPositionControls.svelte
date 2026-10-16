@@ -5,12 +5,14 @@
   import { onDestroy, untrack } from "svelte";
   import QRCode from "$/fabric-object/qrcode";
   import Barcode from "$/fabric-object/barcode";
+  import ArUcoMarker from "$/fabric-object/aruco";
 
   interface Props {
     selectedObject: fabric.FabricObject;
+    editRevision: number;
   }
 
-  let { selectedObject }: Props = $props();
+  let { selectedObject, editRevision }: Props = $props();
   let prevObject: fabric.FabricObject | undefined;
 
   let x = $state<number>();
@@ -20,6 +22,17 @@
   let widthScaled = $state<number>();
   let heightScaled = $state<number>();
   let keepAspectRatio = $state<boolean>(false);
+
+  // Objects without any size input (size is driven by content).
+  const hasNoSizeInputs = $derived(
+    selectedObject instanceof fabric.FabricText ||
+      selectedObject instanceof QRCode ||
+      selectedObject instanceof Barcode,
+  );
+  // Objects whose real size is width/height themselves (scale is baked in on resize).
+  const hasDirectSize = $derived(selectedObject instanceof fabric.Rect || selectedObject instanceof ArUcoMarker);
+  // Everything else (images, circles, lines, polylines, groups/SVG) is resized through scaleX/scaleY.
+  const hasScaledSize = $derived(!hasNoSizeInputs && !hasDirectSize);
 
   const objectDimensionsChanged = (e?: fabric.ModifiedEvent) => {
     const pos = selectedObject.getPointByOrigin("left", "top");
@@ -50,23 +63,27 @@
 
     selectedObject.setPositionByOrigin(newPos, "left", "top");
 
-    if (selectedObject instanceof fabric.FabricImage) {
+    if (hasScaledSize) {
+      const baseWidth = selectedObject.width || 1;
+      const baseHeight = selectedObject.height || 1;
+
       if (keepAspectRatio) {
-        let scale = source === "width" ? widthScaled! / selectedObject.width! : heightScaled! / selectedObject.height!;
+        const scale = source === "width" ? widthScaled! / baseWidth : heightScaled! / baseHeight;
 
         selectedObject.scaleX = scale;
         selectedObject.scaleY = scale;
       } else {
-        selectedObject.scaleX = widthScaled! / selectedObject.width!;
-        selectedObject.scaleY = heightScaled! / selectedObject.height!;
+        selectedObject.scaleX = widthScaled! / baseWidth;
+        selectedObject.scaleY = heightScaled! / baseHeight;
       }
 
       updateScales();
-    } else
+    } else if (hasDirectSize) {
       selectedObject.set({
         width: Math.round(Math.max(width!, 1)),
         height: Math.round(Math.max(height!, 1)),
       });
+    }
 
     selectedObject.setCoords();
     selectedObject.canvas?.requestRenderAll();
@@ -93,6 +110,16 @@
 
   onDestroy(() => selectedObject.off("modified", objectDimensionsChanged));
 
+  // Center/fit buttons don't fire "modified" but bump editRevision
+  $effect(() => {
+    void editRevision;
+    untrack(() => {
+      const keepRatio = keepAspectRatio; // re-syncing values must not flip the aspect ratio toggle
+      objectDimensionsChanged();
+      keepAspectRatio = keepRatio;
+    });
+  });
+
   $effect(() => {
     const obj = selectedObject;
     // Only re-sync when the selected object changes. Without untrack the effect also tracks
@@ -118,14 +145,14 @@
       <span class="input-group-text">y</span>
       <input class="form-control" type="number" bind:value={y} oninput={updateObject} />
     </div>
-    {#if !(selectedObject instanceof fabric.FabricText || selectedObject instanceof fabric.FabricImage || selectedObject instanceof QRCode || selectedObject instanceof Barcode)}
+    {#if hasDirectSize}
       <div class="input-group flex-nowrap input-group-sm mb-2">
         <input class="form-control" type="number" min="1" bind:value={width} oninput={updateObject} />
         <span class="input-group-text">x</span>
         <input class="form-control" type="number" min="1" bind:value={height} oninput={updateObject} />
       </div>
     {/if}
-    {#if selectedObject instanceof fabric.FabricImage}
+    {#if hasScaledSize}
       <div class="input-group flex-nowrap input-group-sm mb-2">
         <input
           class="form-control"
