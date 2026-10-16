@@ -7,7 +7,7 @@ import { OBJECT_DEFAULTS_TEXT } from "$/defaults";
 /**
  * How an object's size is edited:
  * - square:  QR code, ArUco. Width and height are always equal (one size value).
- * - rect:    Rect. Width and height are real, independent values.
+ * - rect:    Rect. Width and height are real values (scale stays 1). Edited like "scaled", so it shares the inputs.
  * - content: Text, barcode. Size is driven by the content, no size inputs.
  * - scaled:  Image, circle, line, polyline, SVG group. Resized through scaleX/scaleY.
  */
@@ -49,9 +49,15 @@ export class CanvasUtils {
     (obj as { lockAspectRatio?: boolean }).lockAspectRatio = locked;
   }
 
-  /** Lock state to show: the stored choice, otherwise on only if the object is currently not distorted. */
+  /**
+   * Lock state to show: the stored choice, otherwise on only if the object is currently not distorted.
+   * A rect always has scale 1, so there is nothing to compare: it starts unlocked.
+   */
   static isAspectLocked(obj: fabric.FabricObject): boolean {
-    return CanvasUtils.getAspectLock(obj) ?? Math.abs(obj.scaleX - obj.scaleY) < 1e-6;
+    const stored = CanvasUtils.getAspectLock(obj);
+    if (stored !== undefined) return stored;
+    if (CanvasUtils.getSizeKind(obj) === "rect") return false;
+    return Math.abs(obj.scaleX - obj.scaleY) < 1e-6;
   }
 
   static equalSpacingFillText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, printWidth: number) {

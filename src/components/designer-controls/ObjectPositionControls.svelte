@@ -22,8 +22,10 @@
   let keepAspectRatio = $state<boolean>(false);
 
   const sizeKind = $derived(CanvasUtils.getSizeKind(selectedObject));
+  // Rect and scaled objects share the same size inputs and the aspect switch.
+  const hasSizeInputs = $derived(sizeKind === "scaled" || sizeKind === "rect");
   // A line has no aspect ratio to keep.
-  const canKeepAspect = $derived(sizeKind === "scaled" && !CanvasUtils.isLine(selectedObject));
+  const canKeepAspect = $derived(hasSizeInputs && !CanvasUtils.isLine(selectedObject));
 
   const objectDimensionsChanged = (e?: fabric.ModifiedEvent) => {
     const pos = selectedObject.getPointByOrigin("left", "top");
@@ -53,26 +55,29 @@
     prevObject = newObject;
   };
 
-  /** Apply the edited width/height of an object that is resized through scaleX/scaleY. */
-  const applyScaledSize = (source: "width" | "height"): boolean => {
+  /** Apply the edited width/height. Rects change width/height, other objects change scaleX/scaleY. */
+  const applySize = (source: "width" | "height"): boolean => {
     const obj = selectedObject;
     const isWidth = source === "width";
-    const base = isWidth ? obj.width : obj.height;
+    const shown = isWidth ? obj.width * obj.scaleX : obj.height * obj.scaleY;
     const wanted = isWidth ? widthScaled : heightScaled;
 
     // Ignore transient input while typing, and axes without extent (e.g. height of a horizontal line).
-    if (!(base > 0) || !(wanted! >= 1)) return false;
+    if (!(shown > 0) || !(wanted! >= 1)) return false;
 
-    const scale = wanted! / base;
     // Keeping the aspect ratio means keeping the ratio the object has now, not forcing it to 1:1.
-    const ratio = obj.scaleY / obj.scaleX;
+    const factor = wanted! / shown;
+    const keep = canKeepAspect && keepAspectRatio;
+    const factorX = isWidth || keep ? factor : 1;
+    const factorY = !isWidth || keep ? factor : 1;
 
-    if (isWidth) {
-      obj.scaleX = scale;
-      if (canKeepAspect && keepAspectRatio) obj.scaleY = scale * ratio;
+    if (sizeKind === "rect") {
+      obj.set({
+        width: Math.max(1, Math.round(obj.width * factorX)),
+        height: Math.max(1, Math.round(obj.height * factorY)),
+      });
     } else {
-      obj.scaleY = scale;
-      if (canKeepAspect && keepAspectRatio) obj.scaleX = scale / ratio;
+      obj.set({ scaleX: obj.scaleX * factorX, scaleY: obj.scaleY * factorY });
     }
 
     // Show the other axis result; the edited input is left alone so typing is not interrupted.
@@ -86,14 +91,11 @@
   const updateObject = (source?: "width" | "height") => {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
-    if (sizeKind === "scaled") {
-      if (source !== undefined && !applyScaledSize(source)) return;
+    if (hasSizeInputs) {
+      if (source !== undefined && !applySize(source)) return;
     } else if (sizeKind === "square") {
       if (!Number.isFinite(width) || width! < CanvasUtils.SQUARE_MIN_SIZE) return;
       CanvasUtils.setSquareSize(selectedObject, width!);
-    } else if (sizeKind === "rect") {
-      if (!(width! >= 1) || !(height! >= 1)) return;
-      selectedObject.set({ width: Math.round(width!), height: Math.round(height!) });
     }
 
     // Position last: a size change may move the top-left corner of objects that scale around their center.
@@ -157,13 +159,7 @@
           onchange={squareSizeCommitted} />
         <span class="input-group-text">px</span>
       </div>
-    {:else if sizeKind === "rect"}
-      <div class="input-group flex-nowrap input-group-sm mb-2">
-        <input class="form-control" type="number" min="1" bind:value={width} oninput={() => updateObject()} />
-        <span class="input-group-text">x</span>
-        <input class="form-control" type="number" min="1" bind:value={height} oninput={() => updateObject()} />
-      </div>
-    {:else if sizeKind === "scaled"}
+    {:else if hasSizeInputs}
       <div class="input-group flex-nowrap input-group-sm mb-2">
         <input
           class="form-control"
