@@ -1,3 +1,8 @@
+<script module lang="ts">
+  // Remembers the "keep aspect ratio" choice per object across deselect/reselect.
+  const aspectLock = new WeakMap<object, boolean>();
+</script>
+
 <script lang="ts">
   import MdIcon from "$/components/basic/MdIcon.svelte";
   import { tr } from "$/utils/i18n";
@@ -23,16 +28,16 @@
   let heightScaled = $state<number>();
   let keepAspectRatio = $state<boolean>(false);
 
+  // Square objects (QR code, ArUco): one size field, width and height are always equal.
+  const isSquare = $derived(selectedObject instanceof QRCode || selectedObject instanceof ArUcoMarker);
   // Objects without any size input (size is driven by content).
-  const hasNoSizeInputs = $derived(
-    selectedObject instanceof fabric.FabricText ||
-      selectedObject instanceof QRCode ||
-      selectedObject instanceof Barcode,
-  );
+  const hasNoSizeInputs = $derived(selectedObject instanceof fabric.FabricText || selectedObject instanceof Barcode);
   // Objects whose real size is width/height themselves (scale is baked in on resize).
-  const hasDirectSize = $derived(selectedObject instanceof fabric.Rect || selectedObject instanceof ArUcoMarker);
+  const hasDirectSize = $derived(selectedObject instanceof fabric.Rect);
   // Everything else (images, circles, lines, polylines, groups/SVG) is resized through scaleX/scaleY.
-  const hasScaledSize = $derived(!hasNoSizeInputs && !hasDirectSize);
+  const hasScaledSize = $derived(!hasNoSizeInputs && !hasDirectSize && !isSquare);
+  // Lines have no meaningful aspect ratio.
+  const showAspectToggle = $derived(hasScaledSize && !(selectedObject instanceof fabric.Line));
 
   const objectDimensionsChanged = (e?: fabric.ModifiedEvent) => {
     const pos = selectedObject.getPointByOrigin("left", "top");
@@ -51,6 +56,8 @@
 
     newObject.on("modified", objectDimensionsChanged);
     objectDimensionsChanged();
+    // The remembered choice wins; default only for objects that were never toggled.
+    keepAspectRatio = aspectLock.get(newObject) ?? newObject.scaleX === newObject.scaleY;
 
     prevObject = newObject;
   };
@@ -67,7 +74,7 @@
       const baseWidth = selectedObject.width || 1;
       const baseHeight = selectedObject.height || 1;
 
-      if (keepAspectRatio) {
+      if (keepAspectRatio && showAspectToggle) {
         const scale = source === "width" ? widthScaled! / baseWidth : heightScaled! / baseHeight;
 
         selectedObject.scaleX = scale;
@@ -78,6 +85,12 @@
       }
 
       updateScales();
+    } else if (isSquare) {
+      const size = Math.round(width!);
+      // Ignore transient values while typing (same minimum as when dragging the handle).
+      if (size < 42) return;
+      height = size;
+      selectedObject.set({ width: size, height: size });
     } else if (hasDirectSize) {
       selectedObject.set({
         width: Math.round(Math.max(width!, 1)),
@@ -90,6 +103,8 @@
   };
 
   const toggleAspectRatio = (e: Event) => {
+    aspectLock.set(selectedObject, keepAspectRatio);
+
     if (keepAspectRatio) {
       selectedObject.scaleX = Math.min(selectedObject.scaleX, selectedObject.scaleY);
       selectedObject.scaleY = selectedObject.scaleX;
@@ -103,9 +118,10 @@
     widthScaled = Math.round(width! * selectedObject.scaleX);
     heightScaled = Math.round(height! * selectedObject.scaleY);
 
-    if (action === "scaleX" || action === "scaleY") keepAspectRatio = false;
-    if ((action === "scale" || action === undefined) && selectedObject.scaleX === selectedObject.scaleY)
-      keepAspectRatio = true;
+    if (action === "scaleX" || action === "scaleY") {
+      keepAspectRatio = false;
+      aspectLock.set(selectedObject, false);
+    }
   };
 
   onDestroy(() => selectedObject.off("modified", objectDimensionsChanged));
@@ -145,6 +161,24 @@
       <span class="input-group-text">y</span>
       <input class="form-control" type="number" bind:value={y} oninput={updateObject} />
     </div>
+    {#if isSquare}
+      <div class="input-group flex-nowrap input-group-sm mb-2">
+        <input
+          class="form-control"
+          type="number"
+          min="42"
+          bind:value={width}
+          oninput={updateObject}
+          onchange={(e) => {
+            // Same rounding as dragging: at least 42 and even.
+            const size = Math.max(Math.round(width ?? 42), 42);
+            width = size + (size % 2);
+            height = width;
+            updateObject(e);
+          }} />
+        <span class="input-group-text">px</span>
+      </div>
+    {/if}
     {#if hasDirectSize}
       <div class="input-group flex-nowrap input-group-sm mb-2">
         <input class="form-control" type="number" min="1" bind:value={width} oninput={updateObject} />
@@ -168,6 +202,8 @@
           bind:value={heightScaled}
           oninput={(e) => updateObject(e, "height")} />
       </div>
+    {/if}
+    {#if showAspectToggle}
       <div class="form-check form-switch">
         <input
           class="form-check-input"
