@@ -4,7 +4,51 @@ import Barcode from "$/fabric-object/barcode";
 import QRCode from "$/fabric-object/qrcode";
 import { OBJECT_DEFAULTS_TEXT } from "$/defaults";
 
+/**
+ * How an object's size is edited:
+ * - square:  QR code, ArUco. Width and height are always equal (one size value).
+ * - rect:    Rect. Width and height are real, independent values.
+ * - content: Text, barcode. Size is driven by the content, no size inputs.
+ * - scaled:  Image, circle, line, polyline, SVG group. Resized through scaleX/scaleY.
+ */
+export type SizeKind = "square" | "rect" | "content" | "scaled";
+
 export class CanvasUtils {
+  /** Smallest QR/ArUco side that still renders. */
+  static readonly SQUARE_MIN_SIZE = 42;
+
+  static getSizeKind(obj: fabric.FabricObject): SizeKind {
+    if (obj instanceof QRCode || obj instanceof ArUcoMarker) return "square";
+    if (obj instanceof fabric.Rect) return "rect";
+    if (obj instanceof fabric.FabricText || obj instanceof Barcode) return "content";
+    return "scaled";
+  }
+
+  /** Squares have a minimum size and an even side length (avoids half-pixel rendering). */
+  static normalizeSquareSize(size: number): number {
+    const rounded = Math.max(Math.round(size), CanvasUtils.SQUARE_MIN_SIZE);
+    return rounded + (rounded % 2);
+  }
+
+  static setSquareSize(obj: fabric.FabricObject, size: number) {
+    const side = CanvasUtils.normalizeSquareSize(size);
+    obj.set({ width: side, height: side });
+  }
+
+  /** User choice stored on the object, so it survives deselect, undo/redo, save and load. */
+  static getAspectLock(obj: fabric.FabricObject): boolean | undefined {
+    return (obj as { lockAspectRatio?: boolean }).lockAspectRatio;
+  }
+
+  static setAspectLock(obj: fabric.FabricObject, locked: boolean) {
+    (obj as { lockAspectRatio?: boolean }).lockAspectRatio = locked;
+  }
+
+  /** Lock state to show: the stored choice, otherwise on only if the object is currently not distorted. */
+  static isAspectLocked(obj: fabric.FabricObject): boolean {
+    return CanvasUtils.getAspectLock(obj) ?? Math.abs(obj.scaleX - obj.scaleY) < 1e-6;
+  }
+
   static equalSpacingFillText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, printWidth: number) {
     // calculate every character width, and spacing
     const widths = [];
@@ -26,9 +70,11 @@ export class CanvasUtils {
   }
 
   static fixFabricObjectScale(obj: fabric.FabricObject) {
-    const isNotScalable = obj instanceof Barcode || obj instanceof fabric.Rect || obj instanceof QRCode || obj instanceof ArUcoMarker;
+    const kind = CanvasUtils.getSizeKind(obj);
+    // These objects keep scale at 1 and store the real size in width/height.
+    const bakesScale = kind === "square" || kind === "rect" || obj instanceof Barcode;
 
-    if (isNotScalable) {
+    if (bakesScale) {
       obj.set({
         width: Math.round(obj.width * (obj.scaleX ?? 1)),
         height: Math.round(obj.height * (obj.scaleY ?? 1)),
@@ -38,13 +84,8 @@ export class CanvasUtils {
         top: Math.round(obj.top),
       });
 
-      if (obj instanceof QRCode || obj instanceof ArUcoMarker) {
-        const qrMin = 42;
-        const size = Math.max(obj.width + (obj.width % 2), qrMin);
-        obj.set({
-          width: size,
-          height: size,
-        });
+      if (kind === "square") {
+        CanvasUtils.setSquareSize(obj, obj.width);
       }
     }
   }

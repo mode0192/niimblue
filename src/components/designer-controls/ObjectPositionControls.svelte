@@ -1,16 +1,9 @@
-<script module lang="ts">
-  // Remembers the "keep aspect ratio" choice per object across deselect/reselect.
-  const aspectLock = new WeakMap<object, boolean>();
-</script>
-
 <script lang="ts">
   import MdIcon from "$/components/basic/MdIcon.svelte";
   import { tr } from "$/utils/i18n";
   import * as fabric from "fabric";
   import { onDestroy, untrack } from "svelte";
-  import QRCode from "$/fabric-object/qrcode";
-  import Barcode from "$/fabric-object/barcode";
-  import ArUcoMarker from "$/fabric-object/aruco";
+  import { CanvasUtils } from "$/utils/canvas_utils";
 
   interface Props {
     selectedObject: fabric.FabricObject;
@@ -28,16 +21,9 @@
   let heightScaled = $state<number>();
   let keepAspectRatio = $state<boolean>(false);
 
-  // Square objects (QR code, ArUco): one size field, width and height are always equal.
-  const isSquare = $derived(selectedObject instanceof QRCode || selectedObject instanceof ArUcoMarker);
-  // Objects without any size input (size is driven by content).
-  const hasNoSizeInputs = $derived(selectedObject instanceof fabric.FabricText || selectedObject instanceof Barcode);
-  // Objects whose real size is width/height themselves (scale is baked in on resize).
-  const hasDirectSize = $derived(selectedObject instanceof fabric.Rect);
-  // Everything else (images, circles, lines, polylines, groups/SVG) is resized through scaleX/scaleY.
-  const hasScaledSize = $derived(!hasNoSizeInputs && !hasDirectSize && !isSquare);
-  // Lines have no meaningful aspect ratio.
-  const showAspectToggle = $derived(hasScaledSize && !(selectedObject instanceof fabric.Line));
+  const sizeKind = $derived(CanvasUtils.getSizeKind(selectedObject));
+  // A line has no aspect ratio to keep.
+  const canKeepAspect = $derived(sizeKind === "scaled" && !(selectedObject instanceof fabric.Line));
 
   const objectDimensionsChanged = (e?: fabric.ModifiedEvent) => {
     const pos = selectedObject.getPointByOrigin("left", "top");
@@ -45,8 +31,14 @@
     y = pos.y;
     width = selectedObject.width;
     height = selectedObject.height;
+    widthScaled = Math.round(width * selectedObject.scaleX);
+    heightScaled = Math.round(height * selectedObject.scaleY);
 
-    updateScales(e?.action);
+    // Dragging a side handle distorts the object, so the lock no longer applies.
+    if (canKeepAspect && (e?.action === "scaleX" || e?.action === "scaleY")) {
+      CanvasUtils.setAspectLock(selectedObject, false);
+      keepAspectRatio = false;
+    }
   };
 
   const objectChanged = (newObject: fabric.FabricObject) => {
@@ -56,72 +48,69 @@
 
     newObject.on("modified", objectDimensionsChanged);
     objectDimensionsChanged();
-    // The remembered choice wins; default only for objects that were never toggled.
-    keepAspectRatio = aspectLock.get(newObject) ?? newObject.scaleX === newObject.scaleY;
+    keepAspectRatio = CanvasUtils.isAspectLocked(newObject);
 
     prevObject = newObject;
   };
 
-  const updateObject = (e: Event, source?: "width" | "height") => {
-    // Inputs are applied live (oninput): skip transient empty/invalid values while typing.
-    if (![x, y, width, height, widthScaled, heightScaled].every(Number.isFinite)) return;
+  /** Apply the edited width/height of an object that is resized through scaleX/scaleY. */
+  const applyScaledSize = (source: "width" | "height"): boolean => {
+    const obj = selectedObject;
+    const isWidth = source === "width";
+    const base = isWidth ? obj.width : obj.height;
+    const wanted = isWidth ? widthScaled : heightScaled;
 
-    const newPos = new fabric.Point(Math.round(x!), Math.round(y!));
+    // Ignore transient input while typing, and axes without extent (e.g. height of a horizontal line).
+    if (!(base > 0) || !(wanted! >= 1)) return false;
 
-    selectedObject.setPositionByOrigin(newPos, "left", "top");
+    const scale = wanted! / base;
+    // Keeping the aspect ratio means keeping the ratio the object has now, not forcing it to 1:1.
+    const ratio = obj.scaleY / obj.scaleX;
 
-    if (hasScaledSize) {
-      const baseWidth = selectedObject.width || 1;
-      const baseHeight = selectedObject.height || 1;
-
-      if (keepAspectRatio && showAspectToggle) {
-        const scale = source === "width" ? widthScaled! / baseWidth : heightScaled! / baseHeight;
-
-        selectedObject.scaleX = scale;
-        selectedObject.scaleY = scale;
-      } else {
-        selectedObject.scaleX = widthScaled! / baseWidth;
-        selectedObject.scaleY = heightScaled! / baseHeight;
-      }
-
-      updateScales();
-    } else if (isSquare) {
-      const size = Math.round(width!);
-      // Ignore transient values while typing (same minimum as when dragging the handle).
-      if (size < 42) return;
-      height = size;
-      selectedObject.set({ width: size, height: size });
-    } else if (hasDirectSize) {
-      selectedObject.set({
-        width: Math.round(Math.max(width!, 1)),
-        height: Math.round(Math.max(height!, 1)),
-      });
+    if (isWidth) {
+      obj.scaleX = scale;
+      if (canKeepAspect && keepAspectRatio) obj.scaleY = scale * ratio;
+    } else {
+      obj.scaleY = scale;
+      if (canKeepAspect && keepAspectRatio) obj.scaleX = scale / ratio;
     }
 
+    // Show the other axis result; the edited input is left alone so typing is not interrupted.
+    if (isWidth) heightScaled = Math.round(obj.height * obj.scaleY);
+    else widthScaled = Math.round(obj.width * obj.scaleX);
+
+    return true;
+  };
+
+  // Inputs are applied live (oninput), so transient empty/invalid values are skipped.
+  const updateObject = (source?: "width" | "height") => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    if (sizeKind === "scaled") {
+      if (source !== undefined && !applyScaledSize(source)) return;
+    } else if (sizeKind === "square") {
+      if (!Number.isFinite(width) || width! < CanvasUtils.SQUARE_MIN_SIZE) return;
+      CanvasUtils.setSquareSize(selectedObject, width!);
+    } else if (sizeKind === "rect") {
+      if (!(width! >= 1) || !(height! >= 1)) return;
+      selectedObject.set({ width: Math.round(width!), height: Math.round(height!) });
+    }
+
+    // Position last: a size change may move the top-left corner of objects that scale around their center.
+    selectedObject.setPositionByOrigin(new fabric.Point(Math.round(x!), Math.round(y!)), "left", "top");
     selectedObject.setCoords();
     selectedObject.canvas?.requestRenderAll();
   };
 
-  const toggleAspectRatio = (e: Event) => {
-    aspectLock.set(selectedObject, keepAspectRatio);
-
-    if (keepAspectRatio) {
-      selectedObject.scaleX = Math.min(selectedObject.scaleX, selectedObject.scaleY);
-      selectedObject.scaleY = selectedObject.scaleX;
-      updateScales();
-
-      updateObject(e);
-    }
+  const squareSizeCommitted = () => {
+    width = CanvasUtils.normalizeSquareSize(width ?? 0);
+    height = width;
+    updateObject();
   };
 
-  const updateScales = (action?: string) => {
-    widthScaled = Math.round(width! * selectedObject.scaleX);
-    heightScaled = Math.round(height! * selectedObject.scaleY);
-
-    if (action === "scaleX" || action === "scaleY") {
-      keepAspectRatio = false;
-      aspectLock.set(selectedObject, false);
-    }
+  const aspectLockChanged = (e: Event & { currentTarget: HTMLInputElement }) => {
+    keepAspectRatio = e.currentTarget.checked;
+    CanvasUtils.setAspectLock(selectedObject, keepAspectRatio);
   };
 
   onDestroy(() => selectedObject.off("modified", objectDimensionsChanged));
@@ -129,17 +118,13 @@
   // Center/fit buttons don't fire "modified" but bump editRevision
   $effect(() => {
     void editRevision;
-    untrack(() => {
-      const keepRatio = keepAspectRatio; // re-syncing values must not flip the aspect ratio toggle
-      objectDimensionsChanged();
-      keepAspectRatio = keepRatio;
-    });
+    untrack(() => objectDimensionsChanged());
   });
 
   $effect(() => {
     const obj = selectedObject;
     // Only re-sync when the selected object changes. Without untrack the effect also tracks
-    // width/height (read in updateScales) and resets the inputs on every keystroke.
+    // state read while syncing and resets the inputs on every keystroke.
     untrack(() => objectChanged(obj));
   });
 </script>
@@ -155,63 +140,57 @@
   <div class="dropdown-menu arrangement p-2">
     <div class="input-group flex-nowrap input-group-sm mb-2">
       <span class="input-group-text">x</span>
-      <input class="form-control" type="number" bind:value={x} oninput={updateObject} />
+      <input class="form-control" type="number" bind:value={x} oninput={() => updateObject()} />
     </div>
     <div class="input-group flex-nowrap input-group-sm mb-2">
       <span class="input-group-text">y</span>
-      <input class="form-control" type="number" bind:value={y} oninput={updateObject} />
+      <input class="form-control" type="number" bind:value={y} oninput={() => updateObject()} />
     </div>
-    {#if isSquare}
+    {#if sizeKind === "square"}
       <div class="input-group flex-nowrap input-group-sm mb-2">
         <input
           class="form-control"
           type="number"
-          min="42"
+          min={CanvasUtils.SQUARE_MIN_SIZE}
           bind:value={width}
-          oninput={updateObject}
-          onchange={(e) => {
-            // Same rounding as dragging: at least 42 and even.
-            const size = Math.max(Math.round(width ?? 42), 42);
-            width = size + (size % 2);
-            height = width;
-            updateObject(e);
-          }} />
+          oninput={() => updateObject()}
+          onchange={squareSizeCommitted} />
         <span class="input-group-text">px</span>
       </div>
-    {/if}
-    {#if hasDirectSize}
+    {:else if sizeKind === "rect"}
       <div class="input-group flex-nowrap input-group-sm mb-2">
-        <input class="form-control" type="number" min="1" bind:value={width} oninput={updateObject} />
+        <input class="form-control" type="number" min="1" bind:value={width} oninput={() => updateObject()} />
         <span class="input-group-text">x</span>
-        <input class="form-control" type="number" min="1" bind:value={height} oninput={updateObject} />
+        <input class="form-control" type="number" min="1" bind:value={height} oninput={() => updateObject()} />
       </div>
-    {/if}
-    {#if hasScaledSize}
+    {:else if sizeKind === "scaled"}
       <div class="input-group flex-nowrap input-group-sm mb-2">
         <input
           class="form-control"
           type="number"
           min="1"
+          disabled={!width}
           bind:value={widthScaled}
-          oninput={(e) => updateObject(e, "width")} />
+          oninput={() => updateObject("width")} />
         <span class="input-group-text">x</span>
         <input
           class="form-control"
           type="number"
           min="1"
+          disabled={!height}
           bind:value={heightScaled}
-          oninput={(e) => updateObject(e, "height")} />
+          oninput={() => updateObject("height")} />
       </div>
     {/if}
-    {#if showAspectToggle}
+    {#if canKeepAspect}
       <div class="form-check form-switch">
         <input
           class="form-check-input"
           type="checkbox"
           role="switch"
           id="keepImageAspectRatio"
-          bind:checked={keepAspectRatio}
-          onchange={toggleAspectRatio} />
+          checked={keepAspectRatio}
+          onchange={aspectLockChanged} />
         <label class="form-check-label" for="keepImageAspectRatio" style="text-wrap: nowrap">
           {$tr("params.generic.keepAspectRatio")}</label>
       </div>

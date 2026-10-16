@@ -7,6 +7,9 @@ export const configureFabric = () => {
 
   fabric.classRegistry.setClass(TextboxExt, "Textbox");
 
+  // "Keep aspect ratio" choice is saved with the object (undo/redo, save/load, clone).
+  fabric.FabricObject.customProperties = [...fabric.FabricObject.customProperties, "lockAspectRatio"];
+
   fabric.Line.prototype.setControlsVisibility({
     tl: false,
     bl: false,
