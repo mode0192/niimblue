@@ -27,6 +27,12 @@
   // A line has no aspect ratio to keep.
   const canKeepAspect = $derived(hasSizeInputs && !CanvasUtils.isLine(selectedObject));
 
+  // Width / height of a rect when editing started (see applySize).
+  let rectAspect = 1;
+  const rememberRectAspect = () => {
+    if (selectedObject.height > 0) rectAspect = selectedObject.width / selectedObject.height;
+  };
+
   const objectDimensionsChanged = (e?: fabric.ModifiedEvent) => {
     const pos = selectedObject.getPointByOrigin("left", "top");
     x = pos.x;
@@ -35,6 +41,7 @@
     height = selectedObject.height;
     widthScaled = Math.round(width * selectedObject.scaleX);
     heightScaled = Math.round(height * selectedObject.scaleY);
+    rememberRectAspect();
 
     // Dragging a side handle distorts the object, so the lock no longer applies.
     if (canKeepAspect && (e?.action === "scaleX" || e?.action === "scaleY")) {
@@ -72,10 +79,16 @@
     const factorY = !isWidth || keep ? factor : 1;
 
     if (sizeKind === "rect") {
-      obj.set({
-        width: Math.max(1, Math.round(obj.width * factorX)),
-        height: Math.max(1, Math.round(obj.height * factorY)),
-      });
+      // Rect size is whole pixels and the inputs apply on every keystroke. Computing the other side from the
+      // already rounded current size drifts (typing "3", "32", "320" would end at the wrong ratio), so the other
+      // side comes from the ratio remembered when editing started.
+      let newWidth = isWidth ? wanted! : obj.width;
+      let newHeight = isWidth ? obj.height : wanted!;
+      if (keep) {
+        if (isWidth) newHeight = wanted! / rectAspect;
+        else newWidth = wanted! * rectAspect;
+      }
+      obj.set({ width: Math.max(1, Math.round(newWidth)), height: Math.max(1, Math.round(newHeight)) });
     } else {
       obj.set({ scaleX: obj.scaleX * factorX, scaleY: obj.scaleY * factorY });
     }
@@ -113,6 +126,7 @@
   const aspectLockChanged = (e: Event & { currentTarget: HTMLInputElement }) => {
     keepAspectRatio = e.currentTarget.checked;
     CanvasUtils.setAspectLock(selectedObject, keepAspectRatio);
+    rememberRectAspect(); // keep the shape the rect has at the moment the lock is switched on
   };
 
   onDestroy(() => selectedObject.off("modified", objectDimensionsChanged));
