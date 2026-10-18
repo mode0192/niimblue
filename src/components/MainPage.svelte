@@ -14,6 +14,8 @@
   const appVersion = __APP_VERSION__;
   // eslint-disable-next-line no-undef
   const buildDate = __BUILD_DATE__;
+  // eslint-disable-next-line no-undef
+  const sourceUrl = __APP_SOURCE_URL__;
 
   let isStandalone = Utils.getAvailableTransports().capacitorBle || "__TAURI__" in window;
 
@@ -67,7 +69,7 @@
       {buildDate}
     </div>
     <div>
-      <a class="text-secondary" href="https://github.com/MultiMote/niimblue">{$tr("main.code")}</a>
+      <a class="text-secondary" href={sourceUrl}>{$tr("main.code")}</a>
       <button class="text-secondary btn btn-link p-0" onclick={() => debugStuffShow = true}>
         <MdIcon icon="bug_report" />
       </button>
