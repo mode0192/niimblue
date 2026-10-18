@@ -9,28 +9,20 @@ const getDate = (): string => {
   return `${date.getFullYear()}-${fmt(date.getMonth() + 1)}-${fmt(date.getDate())}`;
 };
 
-const DEFAULT_SOURCE_URL = "https://github.com/MultiMote/niimblue";
+const REPO_URL = "https://github.com/MultiMote/niimblue";
 
-const git = (...args: string[]): string | undefined => {
-  try {
-    const out = execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-    return out || undefined;
-  } catch {
-    return undefined; // not a git checkout, or git is not installed
-  }
-};
-
-// Link to the repository and branch this build comes from (e.g. a fork or a feature branch).
-// Falls back to the main repository if it can't be detected (no git, non-GitHub remote).
+// Link to the branch this build was made from. Falls back to the repository root
+// if the branch is unknown (no git, or detached HEAD).
 const getSourceUrl = (): string => {
-  const match = git("remote", "get-url", "origin")?.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?\/?$/);
-  if (!match) return DEFAULT_SOURCE_URL;
-
-  const repoUrl = `https://github.com/${match[1]}`;
-  const branch = git("rev-parse", "--abbrev-ref", "HEAD");
-  if (!branch || branch === "HEAD") return repoUrl; // detached HEAD: there is no branch to link to
-
-  return `${repoUrl}/tree/${branch.split("/").map(encodeURIComponent).join("/")}`;
+  try {
+    const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf8" }).trim();
+    if (branch && branch !== "HEAD") {
+      return `${REPO_URL}/tree/${branch.split("/").map(encodeURIComponent).join("/")}`;
+    }
+  } catch {
+    // not a git checkout, or git is not installed
+  }
+  return REPO_URL;
 };
 
 // https://vitejs.dev/config/
